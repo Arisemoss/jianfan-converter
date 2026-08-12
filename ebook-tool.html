@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
 :root {
   --ink: #1a1a1a;
   --ink-light: #2d2d2d;
@@ -21,16 +22,1302 @@
   --warm-gray: #8b7d6b;
   --warm-gray-light: #a89884;
   --border: #d4c9b8;
+  --shadow: rgba(26, 26, 26, 0.08);
   --radius: 12px;
   --radius-sm: 8px;
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Noto Sans SC', -apple-system, sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; line-height: 1.6; }
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ========== HEADER ========== */
+.header {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--ink);
+}
+.header-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.header-title span { color: var(--gold); }
+.header-sub {
+  font-size: 12px;
+  color: var(--warm-gray-light);
+  letter-spacing: 0.1em;
+  margin-top: -1px;
+}
+.header-badge {
+  background: rgba(201, 169, 110, 0.15);
+  border: 1px solid rgba(201, 169, 110, 0.3);
+  color: var(--gold);
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+/* ========== CONTAINER ========== */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* ========== UPLOAD AREA ========== */
+.upload-zone {
+  background: var(--paper-light);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.upload-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(201,169,110,0.03), rgba(194,59,34,0.02));
+  opacity: 0;
+  transition: var(--transition);
+}
+.upload-zone:hover { border-color: var(--gold); }
+.upload-zone:hover::before { opacity: 1; }
+.upload-zone.dragover {
+  border-color: var(--vermillion);
+  background: rgba(194, 59, 34, 0.03);
+  transform: scale(1.01);
+}
+.upload-zone.has-file {
+  padding: 24px 32px;
+  border-style: solid;
+  border-color: var(--gold);
+}
+.upload-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+  line-height: 1;
+}
+.upload-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.upload-desc {
+  color: var(--warm-gray);
+  font-size: 14px;
+}
+.upload-formats {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.upload-formats span {
+  background: var(--paper-dark);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--warm-gray);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+.upload-input { display: none; }
+
+/* File info */
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+.file-info-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--ink);
+  color: var(--gold);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.file-info-detail { flex: 1; }
+.file-info-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.file-info-meta {
+  font-size: 12px;
+  color: var(--warm-gray);
+}
+.file-remove {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--warm-gray);
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.file-remove:hover {
+  border-color: var(--vermillion);
+  color: var(--vermillion);
+}
+
+/* ========== TOOL SECTION ========== */
+.tools-section {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 860px) {
+  .tools-section { grid-template-columns: 1fr; }
+}
+
+.tool-card {
+  background: var(--paper-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.tool-card:hover { border-color: var(--gold); }
+.tool-card-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.tool-card-header .icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+}
+.tool-card-header h3 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+}
+.tool-card-header .toggle-indicator {
+  color: var(--warm-gray);
+  font-size: 12px;
+  transition: transform 0.3s;
+}
+.tool-card-header .toggle-indicator.collapsed {
+  transform: rotate(-90deg);
+}
+.tool-card-body {
+  padding: 16px 20px 20px;
+  transition: var(--transition);
+}
+.tool-card-body.hidden { display: none; }
+
+/* ========== OPTIONS ========== */
+.option-group { margin-bottom: 14px; }
+.option-group:last-child { margin-bottom: 0; }
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--ink-light);
+}
+.option-label .badge {
+  font-size: 10px;
+  background: var(--paper-dark);
+  color: var(--warm-gray);
+  padding: 0 6px;
+  border-radius: 3px;
+  font-weight: 400;
+}
+
+/* Toggle switch */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.toggle-label {
+  font-size: 13px;
+  color: var(--ink-light);
+  flex: 1;
+}
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+.toggle input:checked + .toggle-slider { background: var(--vermillion); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+/* Select */
+.styled-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: var(--transition);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b7d6b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.styled-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15);
+}
+
+/* Checkbox */
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: var(--transition);
+  user-select: none;
+}
+.checkbox-item:hover { border-color: var(--gold); }
+.checkbox-item.active {
+  border-color: var(--vermillion);
+  background: rgba(194, 59, 34, 0.05);
+  color: var(--vermillion);
+}
+.checkbox-item input { display: none; }
+
+/* Custom input */
+.custom-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  transition: var(--transition);
+  background: white;
+}
+.custom-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15);
+}
+.custom-input::placeholder { color: var(--warm-gray-light); }
+
+/* ========== PREVIEW SECTION ========== */
+.preview-section {
+  margin-top: 28px;
+}
+.preview-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+.preview-tab {
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--warm-gray);
+  position: relative;
+  transition: var(--transition);
+  font-family: inherit;
+}
+.preview-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--vermillion);
+  transform: scaleX(0);
+  transition: transform 0.3s;
+}
+.preview-tab:hover { color: var(--ink); }
+.preview-tab.active {
+  color: var(--ink);
+  font-weight: 600;
+}
+.preview-tab.active::after { transform: scaleX(1); }
+.preview-tab .count {
+  font-size: 11px;
+  background: var(--paper-dark);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 4px;
+  color: var(--warm-gray);
+  font-weight: 400;
+}
+
+.preview-pane {
+  background: white;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  min-height: 280px;
+  max-height: 480px;
+  overflow: auto;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+  font-family: 'Noto Serif SC', serif;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.preview-pane::-webkit-scrollbar { width: 6px; }
+.preview-pane::-webkit-scrollbar-track { background: transparent; }
+.preview-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.preview-pane::-webkit-scrollbar-thumb:hover { background: var(--warm-gray); }
+.preview-pane.hidden { display: none; }
+.preview-pane .placeholder {
+  color: var(--warm-gray-light);
+  text-align: center;
+  padding: 60px 20px;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.preview-pane .placeholder .big-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* ========== ACTION BAR ========== */
+.action-bar {
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.action-bar-left { display: flex; gap: 12px; flex-wrap: wrap; }
+.action-bar-right { display: flex; gap: 12px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--vermillion);
+  color: white;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--vermillion-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(194, 59, 34, 0.25);
+}
+.btn-gold {
+  background: var(--gold);
+  color: var(--ink);
+}
+.btn-gold:hover:not(:disabled) {
+  background: var(--gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 169, 110, 0.25);
+}
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: rgba(26, 26, 26, 0.03);
+}
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* ========== STATS BAR ========== */
+.stats-bar {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  padding: 14px 20px;
+  background: var(--paper-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--warm-gray);
+}
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.stat-item strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ========== TOAST ========== */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  animation: slideIn 0.3s ease;
+  max-width: 360px;
+}
+.toast.success { border-left: 3px solid var(--gold); }
+.toast.error { border-left: 3px solid var(--vermillion); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 640px) {
+  .container { padding: 16px; }
+  .header-inner { padding: 14px 16px; }
+  .header-title { font-size: 18px; }
+  .header-badge { display: none; }
+  .upload-zone { padding: 32px 20px; }
+  .action-bar { flex-direction: column; align-items: stretch; }
+  .action-bar-left, .action-bar-right { justify-content: stretch; }
+  .action-bar-left .btn, .action-bar-right .btn { flex: 1; justify-content: center; }
+  .stats-bar { flex-wrap: wrap; gap: 12px; }
+}
+
+/* ========== PROCESSING OVERLAY ========== */
+.processing-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 26, 0.6);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.processing-overlay.active { display: flex; }
+.processing-card {
+  background: var(--paper-light);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  max-width: 320px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--vermillion);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.processing-card p {
+  font-size: 14px;
+  color: var(--warm-gray);
+}
+
+/* ========== FOOTER ========== */
+.footer {
+  text-align: center;
+  padding: 32px;
+  color: var(--warm-gray);
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+.footer a {
+  color: var(--gold-dark);
+  text-decoration: none;
+}
+
+/* ========== WORD COUNT ========== */
+.word-count-badge {
+  font-size: 11px;
+  background: var(--paper-dark);
+  padding: 1px 8px;
+  border-radius: 8px;
+  color: var(--warm-gray);
+  margin-left: 6px;
+}
 </style>
 </head>
 <body>
-<h1>文简书斋 · 电子书处理工具</h1>
-<p>功能完整版请查看完整 HTML 文件</p>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-icon">&#x1F4D6;</div>
+      <div>
+        <div class="header-title"><span>文简</span>书斋</div>
+        <div class="header-sub">电子书处理工作台</div>
+      </div>
+    </div>
+    <div class="header-badge">&#x2728; 简繁 &middot; 净化 &middot; 去除</div>
+  </div>
+</header>
+
+<!-- ===== CONTAINER ===== -->
+<div class="container">
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone">
+    <div id="uploadEmpty">
+      <span class="upload-icon">&#x1F4C1;</span>
+      <div class="upload-title">上传电子书文件</div>
+      <div class="upload-desc">点击选择文件，或将文件拖拽到此处</div>
+      <div class="upload-formats">
+        <span>TXT</span>
+        <span>HTML</span>
+        <span>MD</span>
+      </div>
+    </div>
+    <div id="uploadFileInfo" style="display:none;">
+      <div class="file-info">
+        <div class="file-info-icon">&#x1F4C4;</div>
+        <div class="file-info-detail">
+          <div class="file-info-name" id="fileName">-</div>
+          <div class="file-info-meta" id="fileMeta">-</div>
+        </div>
+        <button class="file-remove" id="fileRemoveBtn" title="移除文件">&#x2715;</button>
+      </div>
+    </div>
+    <input type="file" class="upload-input" id="fileInput" accept=".txt,.html,.htm,.md,.csv,.json,.xml">
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar" style="display:none;">
+    <span class="stat-item">&#x1F4CB; 总字数：<strong id="statTotalChars">0</strong></span>
+    <span class="stat-item">&#x1F4C4; 总行数：<strong id="statTotalLines">0</strong></span>
+    <span class="stat-item">&#x1F4AD; 中文字数：<strong id="statChineseChars">0</strong></span>
+    <span class="stat-item">&#x1F524; 繁体中文字：<strong id="statTraditionalChars">0</strong></span>
+  </div>
+
+  <!-- Tools -->
+  <div class="tools-section">
+    <!-- 简繁转换 -->
+    <div class="tool-card">
+      <div class="tool-card-header" data-toggle="convBody">
+        <span class="icon">&#x1F504;</span>
+        <h3>简繁转换</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="convBody">
+        <div class="option-group">
+          <div class="option-label">转换方向</div>
+          <select class="styled-select" id="convDirection">
+            <option value="s2t">简体 → 繁体</option>
+            <option value="t2s" selected>繁体 → 简体</option>
+            <option value="s2hk">简体 → 香港繁体</option>
+            <option value="t2hk">繁体 → 香港繁体</option>
+            <option value="s2tw">简体 → 台湾正体</option>
+            <option value="t2tw">繁体 → 台湾正体</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 净化 -->
+    <div class="tool-card">
+      <div class="tool-card-header" data-toggle="cleanBody">
+        <span class="icon">&#x2728;</span>
+        <h3>文本净化</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="cleanBody">
+        <div class="option-group">
+          <div class="option-label">净化选项</div>
+          <div class="checkbox-group">
+            <label class="checkbox-item" data-val="removeBlankLines">
+              <input type="checkbox"> 清除空白行
+            </label>
+            <label class="checkbox-item" data-val="removeExtraSpaces">
+              <input type="checkbox"> 合并多余空格
+            </label>
+            <label class="checkbox-item" data-val="removeExtraNewlines">
+              <input type="checkbox"> 合并连续换行
+            </label>
+            <label class="checkbox-item" data-val="normalizePunct">
+              <input type="checkbox"> 统一标点符号
+            </label>
+            <label class="checkbox-item" data-val="removeSpecialChars">
+              <input type="checkbox"> 清除特殊符号
+            </label>
+            <label class="checkbox-item" data-val="trimLines">
+              <input type="checkbox"> 去除行首尾空白
+            </label>
+            <label class="checkbox-item" data-val="removeUrls">
+              <input type="checkbox"> 清除网址链接
+            </label>
+            <label class="checkbox-item" data-val="removeEmails">
+              <input type="checkbox"> 清除邮箱地址
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 去除 -->
+    <div class="tool-card">
+      <div class="tool-card-header" data-toggle="removeBody">
+        <span class="icon">&#x2702;&#xFE0F;</span>
+        <h3>自定义去除</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="removeBody">
+        <div class="option-group">
+          <div class="option-label">快速去除</div>
+          <div class="checkbox-group">
+            <label class="checkbox-item" data-val="removeHtmlTags">
+              <input type="checkbox"> HTML 标签
+            </label>
+            <label class="checkbox-item" data-val="removeNumbers">
+              <input type="checkbox"> 数字
+            </label>
+            <label class="checkbox-item" data-val="removeEnglish">
+              <input type="checkbox"> 英文字母
+            </label>
+            <label class="checkbox-item" data-val="removePunctuation">
+              <input type="checkbox"> 所有标点符号
+            </label>
+          </div>
+        </div>
+        <div class="option-group" style="margin-top:12px;">
+          <div class="option-label">自定义正则 / 关键词 <span class="badge">每行一个</span></div>
+          <textarea class="custom-input" id="customRemovePatterns" rows="3" placeholder="输入要删除的文本或正则表达式，每行一个&#10;例如：&#10;第\d+章&#10;转载请注明出处"></textarea>
+        </div>
+        <div class="option-group" style="margin-top:8px;">
+          <div class="toggle-wrap">
+            <span class="toggle-label">使用正则表达式匹配</span>
+            <label class="toggle">
+              <input type="checkbox" id="useRegex">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全部处理 -->
+    <div class="tool-card" style="grid-column: span 1;">
+      <div class="tool-card-header" data-toggle="batchBody">
+        <span class="icon">&#x26A1;</span>
+        <h3>一键处理</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="batchBody">
+        <div class="option-group">
+          <div class="option-label">顺序执行：简繁转换 → 净化 → 去除</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button class="btn btn-primary" id="btnProcessAll" disabled>&#x26A1; 执行全部处理</button>
+            <button class="btn btn-outline btn-sm" id="btnResetPreview" disabled>&#x21BA; 重置预览</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <div class="action-bar-left">
+      <button class="btn btn-gold" id="btnDownload" disabled>&#x2B07; 下载处理后的文件</button>
+      <button class="btn btn-outline" id="btnCopyResult" disabled>&#x1F4CB; 复制到剪贴板</button>
+    </div>
+    <div class="action-bar-right">
+      <button class="btn btn-outline btn-sm" id="btnTogglePreviewMode">&#x1F4DC; 切换视图</button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-section" style="margin-top:16px;">
+    <div class="preview-tabs">
+      <button class="preview-tab active" data-pane="originalPane">原始文本 <span class="count" id="origCount">0 字</span></button>
+      <button class="preview-tab" data-pane="resultPane">处理后文本 <span class="count" id="resultCount">0 字</span></button>
+    </div>
+    <div class="preview-pane" id="originalPane">
+      <div class="placeholder">
+        <span class="big-icon">&#x1F4D6;</span>
+        上传文件后，原始内容将在此显示
+      </div>
+    </div>
+    <div class="preview-pane hidden" id="resultPane">
+      <div class="placeholder">
+        <span class="big-icon">&#x2699;&#xFE0F;</span>
+        执行处理后，结果将在此显示
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  文简书斋 &middot; 电子书处理工具 &mdash; 所有处理在浏览器本地完成，文件不会上传至服务器
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing-overlay" id="processingOverlay">
+  <div class="processing-card">
+    <div class="spinner"></div>
+    <p>正在处理中，请稍候...</p>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ========================
+//  STATE
+// ========================
+const state = {
+  rawText: '',
+  processedText: '',
+  fileName: '',
+  fileSize: 0,
+  isProcessing: false,
+};
+
+// ========================
+//  DOM REFS
+// ========================
+const $ = (id) => document.getElementById(id);
+const uploadZone = $('uploadZone');
+const uploadEmpty = $('uploadEmpty');
+const uploadFileInfo = $('uploadFileInfo');
+const fileInput = $('fileInput');
+const fileName = $('fileName');
+const fileMeta = $('fileMeta');
+const fileRemoveBtn = $('fileRemoveBtn');
+const statsBar = $('statsBar');
+const statTotalChars = $('statTotalChars');
+const statTotalLines = $('statTotalLines');
+const statChineseChars = $('statChineseChars');
+const statTraditionalChars = $('statTraditionalChars');
+const originalPane = $('originalPane');
+const resultPane = $('resultPane');
+const origCount = $('origCount');
+const resultCount = $('resultCount');
+const btnDownload = $('btnDownload');
+const btnCopyResult = $('btnCopyResult');
+const btnProcessAll = $('btnProcessAll');
+const btnResetPreview = $('btnResetPreview');
+const processingOverlay = $('processingOverlay');
+const toastContainer = $('toastContainer');
+
+// ========================
+//  FILE UPLOAD
+// ========================
+uploadZone.addEventListener('click', (e) => {
+  if (e.target.closest('.file-remove')) return;
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+});
+
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+});
+uploadZone.addEventListener('dragleave', () => {
+  uploadZone.classList.remove('dragover');
+});
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+});
+
+fileRemoveBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  removeFile();
+});
+
+function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
+  if (!allowed.includes(ext)) {
+    showToast('不支持的文件格式：.' + ext + '，请上传 TXT、HTML、MD 等文本文件', 'error');
+    return;
+  }
+
+  state.fileName = file.name;
+  state.fileSize = file.size;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.rawText = e.target.result;
+    state.processedText = '';
+    updateFileUI();
+    updateStats(state.rawText);
+    showPreview('original', state.rawText);
+    clearResult();
+    btnProcessAll.disabled = false;
+    btnResetPreview.disabled = false;
+    showToast('文件加载成功：' + file.name, 'success');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function removeFile() {
+  state.rawText = '';
+  state.processedText = '';
+  state.fileName = '';
+  state.fileSize = 0;
+  uploadEmpty.style.display = '';
+  uploadFileInfo.style.display = 'none';
+  uploadZone.classList.remove('has-file');
+  statsBar.style.display = 'none';
+  originalPane.innerHTML = '<div class="placeholder"><span class="big-icon">&#x1F4D6;</span>上传文件后，原始内容将在此显示</div>';
+  resultPane.innerHTML = '<div class="placeholder"><span class="big-icon">&#x2699;&#xFE0F;</span>执行处理后，结果将在此显示</div>';
+  origCount.textContent = '0 字';
+  resultCount.textContent = '0 字';
+  btnProcessAll.disabled = true;
+  btnResetPreview.disabled = true;
+  btnDownload.disabled = true;
+  btnCopyResult.disabled = true;
+  fileInput.value = '';
+}
+
+function updateFileUI() {
+  uploadEmpty.style.display = 'none';
+  uploadFileInfo.style.display = '';
+  uploadZone.classList.add('has-file');
+  fileName.textContent = state.fileName;
+  const size = state.fileSize;
+  if (size < 1024) fileMeta.textContent = size + ' B';
+  else if (size < 1024 * 1024) fileMeta.textContent = (size / 1024).toFixed(1) + ' KB';
+  else fileMeta.textContent = (size / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// ========================
+//  STATS
+// ========================
+function updateStats(text) {
+  if (!text) { statsBar.style.display = 'none'; return; }
+  statsBar.style.display = 'flex';
+  const totalChars = text.length;
+  const lines = text.split('\n').length;
+  const chineseChars = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+  const tradChars = countTraditional(text);
+  statTotalChars.textContent = totalChars.toLocaleString();
+  statTotalLines.textContent = lines.toLocaleString();
+  statChineseChars.textContent = chineseChars.toLocaleString();
+  statTraditionalChars.textContent = tradChars.toLocaleString();
+}
+
+function countTraditional(text) {
+  // Common traditional Chinese characters
+  const tradRanges = [
+    /[\u4e42-\u4e4e\u4e5a\u4e5c\u4e5e\u4e7e\u4e86\u4ee4\u4ef2\u4f1b\u4f50\u4f5f\u4f60\u4f7f\u4f8b\u4f9b\u4fdd\u4fbf\u5006\u5009\u500b\u500e\u5012\u5016\u502b\u5036\u5049\u504f\u5055\u505a\u505c\u5065\u508d\u5091\u5098\u50a7\u50ad\u50b3\u50b7\u50be\u50c5\u50c9\u50d5\u50e3\u50ed\u50f9\u5100\u5104\u5109\u5112\u511f\u512a\u5132\u5137\u513b\u5140\u5141\u5143\u514b\u5154\u5156\u515c\u5167\u5169\u516d\u5171\u5177\u5178\u517c\u5180\u518d\u5192\u5195\u5197\u51a0\u51a2\u51a5\u51ac\u51b0\u51b6\u51b7\u51c4\u51c6\u51c9\u51cb\u51cc\u51cd\u51cf\u51da\u51dc\u51dd\u51e4\u51ed\u51f0\u51f1\u51f6\u51f8\u51f9\u51fa\u51fb\u51fd\u51ff\u5200\u5201\u5202\u5203\u5206\u5207\u5208\u520a\u520e\u5211\u5212\u5217\u521d\u5224\u5225\u5228\u5229\u522a\u522e\u5230\u5231\u5237\u5238\u5239\u523a\u523b\u523d\u523f\u5240\u5241\u5242\u5243\u5244\u5246\u5247\u524a\u524b\u524c\u524d\u524e\u5250\u5251\u5254\u5255\u5256\u5257\u525a\u525b\u525c\u525d\u525e\u525f\u5260\u5261\u5262\u5263\u5264\u5265\u5267\u5269\u526a\u526b\u526c\u526d\u526e\u526f\u5270\u5272\u5274\u5275\u5277\u527f\u5280\u5281\u5282\u5283\u5284\u5287\u5288\u5289\u528a\u528b\u528c\u528d\u5290\u5291\u5293\u5294\u529b\u529f\u52a0\u52a1\u52a3\u52a6\u52a8\u52a9\u52aa\u52ab\u52ac\u52ad\u52b1\u52b2\u52b3\u52bd\u52be\u52c3\u52c7\u52c9\u52cb\u52d0\u52d2\u52d4\u52d6\u52d8\u52d9\u52db\u52dd\u52de\u52df\u52e2\u52e3\u52e4\u52e6\u52e7\u52e9\u52f0\u52f1\u52f3\u52f5\u52f8\u52fa\u52fb\u52fc\u52fe\u52ff\u5300\u5301\u5302\u5305\u5306\u5308\u530a\u530b\u530c\u530d\u530f\u5310\u5311\u5315\u5316\u5317\u5319\u531c\u531d\u5320\u5321\u5323\u5326\u532a\u532d\u5330\u5331\u5339\u533a\u533b\u533c\u533e\u533f\u5340\u5341\u5343\u5344\u5345\u5347\u5348\u5349\u534a\u534c\u534d\u5351\u5352\u5353\u5354\u5355\u5356\u5357\u5358\u535a\u535c\u535e\u5360\u5361\u5362\u5364\u5366\u5367\u5369\u536b\u536c\u536d\u536e\u536f\u5370\u5371\u5372\u5373\u5374\u5375\u5377\u5378\u5379\u537a\u537b\u537c\u537f\u5382\u5384\u5385\u5386\u5389\u538b\u538c\u538d\u538e\u538f\u5390\u5391\u5395\u5398\u539a\u539d\u539f\u53a2\u53a3\u53a5\u53a6\u53a8\u53a9\u53ab\u53ac\u53ad\u53ae\u53b2\u53b4\u53b6\u53b9\u53bb\u53c1\u53c2\u53c3\u53c8\u53c9\u53ca\u53cb\u53cc\u53cd\u53d1\u53d4\u53d6\u53d7\u53d8\u53d9\u53db\u53df\u53e0\u53e1\u53e2\u53e3\u53e4\u53e5\u53e6\u53e8\u53e9\u53ea\u53eb\u53ec\u53ed\u53ee\u53ef\u53f0\u53f1\u53f2\u53f3\u53f5\u53f6\u53f7\u53f8\u53f9\u53fb\u53fc\u53fe\u53ff\u5400\u5401\u5403\u5404\u5406\u5408\u5409\u540a\u540b\u540c\u540d\u540e\u540f\u5410\u5411\u5412\u5413\u5414\u5415\u5416\u5417\u541b\u541c\u541d\u541e\u541f\u5420\u5421\u5422\u5423\u5426\u5427\u5428\u5429\u542b\u542c\u542d\u542e\u542f\u5430\u5431\u5432\u5433\u5434\u5435\u5436\u5438\u5439\u543b\u543c\u543d\u543e\u543f\u5440\u5442\u5443\u5444\u5446\u5447\u5448\u544a\u544b\u544c\u544d\u544e\u544f\u5450\u5451\u5452\u5453\u5454\u5455\u5456\u5457\u5458\u5459\u545b\u545c\u545d\u545e\u545f\u5460\u5461\u5462\u5463\u5464\u5466\u5467\u5468\u546a\u546b\u546c\u546d\u546e\u546f\u5470\u5471\u5472\u5473\u5474\u5475\u5476\u5477\u5478\u547b\u547c\u547d\u547f\u5480\u5481\u5482\u5484\u5486\u5487\u5488\u548b\u548c\u548e\u548f\u5490\u5491\u5492\u5496\u549a\u549b\u549c\u54a4\u54a6\u54a7\u54a8\u54ab\u54ac\u54b1\u54b3\u54b8\u54bd\u54c0\u54c1\u54c4\u54c6\u54c7\u54c8\u54c9\u54cd\u54ce\u54d9\u54dc\u54dd\u54de\u54e0\u54e1\u54e2\u54e5\u54e6\u54e7\u54e8\u54e9\u54ea\u54eb\u54ed\u54ee\u54f1\u54f2\u54f3\u54fa\u54fc\u54fd\u54ff\u5500\u5501\u5502\u5503\u5504\u5505\u5506\u5507\u5508\u5509\u550a\u550e\u550f\u5510\u5511\u5514\u551a\u5520\u5521\u5522\u5523\u5524\u5527\u552a\u552c\u552e\u5530\u5531\u5533\u5535\u5537\u5538\u5539\u553b\u553c\u553e\u553f\u5540\u5541\u5543\u5544\u5545\u5546\u5548\u5549\u554a\u554b\u554c\u554d\u554e\u554f\u5550\u5551\u5553\u5555\u5556\u5557\u555c\u555e\u555f\u5560\u5561\u5562\u5563\u5564\u5565\u5566\u5567\u556a\u556b\u556c\u556d\u556e\u5570\u5571\u5572\u5574\u5575\u5576\u5577\u5578\u557b\u557c\u557e\u557f\u5580\u5581\u5582\u5583\u5584\u5587\u5588\u5589\u558a\u558b\u558e\u558f\u5590\u5591\u5592\u5593\u5594\u5598\u5599\u559a\u559c\u559d\u559e\u559f\u55a3\u55a4\u55a7\u55a8\u55a9\u55aa\u55ab\u55ac\u55ad\u55ae\u55b0\u55b1\u55b2\u55b3\u55b5\u55b7\u55b9\u55bb\u55bd\u55be\u55c4\u55c5\u55c6\u55c9\u55cb\u55cc\u55ce\u55d0\u55d1\u55d2\u55d3\u55d4\u55d6\u55d9\u55da\u55db\u55dc\u55dd\u55df\u55e1\u55e2\u55e3\u55e4\u55e6\u55e8\u55e9\u55ea\u55eb\u55ec\u55ef\u55f2\u55f3\u55f5\u55f6\u55f7\u55f9\u55fa\u55fc\u55fd\u55fe\u5600\u5601\u5602\u5604\u5605\u5606\u5608\u5609\u560c\u560d\u560e\u560f\u5610\u5611\u5612\u5614\u5616\u5617\u5618\u561b\u561c\u561d\u561e\u561f\u5620\u5621\u5622\u5623\u5624\u5625\u5626\u5627\u5628\u5629\u562a\u562b\u562c\u562e\u562f\u5630\u5631\u5632\u5634\u5635\u5636\u5637\u5638\u5639\u563b\u563c\u563d\u563e\u563f\u5640\u5641\u5642\u5643\u5644\u5645\u5646\u5647\u5648\u564c\u564d\u564e\u564f\u5650\u5653\u5654\u5659\u565b\u565c\u565d\u5660\u5662\u5664\u5665\u5666\u5668\u5669\u566a\u566b\u566c\u566d\u566f\u5670\u5671\u5672\u5674\u5676\u5678\u5679\u567a\u567b\u567c\u567e\u567f\u5680\u5682\u5684\u5685\u5686\u5687\u5689\u568a\u568b\u568c\u568e\u568f\u5690\u5692\u5693\u5695\u5697\u5698\u5699\u569a\u569c\u569d\u569e\u569f\u56a1\u56a2\u56a3\u56a4\u56a6\u56a7\u56a8\u56a9\u56ab\u56ac\u56ad\u56ae\u56af\u56b0\u56b1\u56b2\u56b3\u56b4\u56b6\u56b7\u56b9\u56ba\u56bb\u56bc\u56bd\u56be\u56bf\u56c0\u56c1\u56c2\u56c3\u56c5\u56c8\u56c9\u56ca\u56cb\u56cc\u56cd\u56ce\u56cf\u56d0\u56d1\u56d4\u56d7\u56d9\u56da\u56db\u56dd\u56de\u56df\u56e0\u56e1\u56e4\u56e5\u56e8\u56ea\u56eb\u56ed\u56ee\u56ef\u56f0\u56f1\u56f4\u56f5\u56f6\u56f7\u56f9\u56fa\u56fd\u56fe\u56ff\u5700\u5701\u5702\u5703\u5704\u5707\u5708\u5709\u570a\u570b\u570c\u570d\u570e\u570f\u5710\u5711\u5712\u5713\u5714\u5716\u5718\u5719\u571a\u571b\u571c\u571d\u571e\u571f\u5720\u5721\u5722\u5723\u5728\u5729\u572a\u572c\u572d\u572e\u572f\u5730\u5733\u5739\u573b\u573e\u5740\u5742\u5747\u574a\u574e\u574f\u5750\u5751\u5752\u5757\u575a\u575b\u575c\u575d\u575e\u575f\u5760\u5761\u5764\u5766\u5768\u5769\u576a\u576b\u576d\u576f\u5770\u5771\u5773\u5774\u5775\u5776\u5777\u577b\u577c\u577d\u5782\u5783\u5784\u5786\u5788\u578b\u578c\u578f\u5792\u5793\u5794\u579b\u579c\u579f\u57a0\u57a1\u57a2\u57a3\u57a4\u57a6\u57a7\u57a9\u57ab\u57ad\u57ae\u57b0\u57b1\u57b2\u57b4\u57b5\u57b7\u57b8\u57b9\u57ba\u57bb\u57bc\u57bd\u57be\u57bf\u57c1\u57c2\u57c3\u57c6\u57c7\u57cb\u57cc\u57ce\u57cf\u57d0\u57d2\u57d4\u57d5\u57d7\u57d8\u57d9\u57dc\u57df\u57e0\u57e1\u57e3\u57e4\u57e6\u57e7\u57e9\u57ed\u57f0\u57f4\u57f5\u57f6\u57f7\u57f8\u57f9\u57fa\u57fc\u57fd\u57fe\u57ff\u5800\u5802\u5803\u5805\u5806\u5807\u580a\u580b\u580d\u580e\u580f\u5810\u5811\u5815\u5816\u5819\u581b\u581c\u581d\u581e\u581f\u5820\u5821\u5824\u5826\u5827\u5828\u582a\u582d\u582f\u5830\u5831\u5832\u5834\u5835\u583a\u583b\u583d\u5840\u5844\u584a\u584b\u584c\u5851\u5852\u5854\u5857\u5858\u585a\u585e\u5862\u5863\u5865\u586b\u586c\u5870\u5871\u5875\u5879\u587c\u587e\u587f\u5880\u5881\u5883\u5885\u5887\u5889\u588a\u588b\u588d\u588e\u5890\u5893\u5897\u5898\u5899\u589a\u589c\u589e\u589f\u58a0\u58a1\u58a3\u58a5\u58a6\u58a8\u58a9\u58ab\u58ac\u58ae\u58af\u58b0\u58b1\u58b2\u58b3\u58b6\u58b8\u58b9\u58ba\u58bb\u58bc\u58bd\u58be\u58c0\u58c1\u58c2\u58c5\u58c7\u58c8\u58ca\u58cc\u58ce\u58d1\u58d3\u58d5\u58d8\u58d9\u58da\u58dc\u58de\u58df\u58e0\u58e2\u58e4\u58e9\u58eb\u58ec\u58ef\u58f0\u58f1\u58f2\u58f3\u58f6\u58f7\u58f9\u58fc\u58fd\u58fe\u5900\u5902\u5904\u5906\u5907\u590a\u590d\u590f\u5910\u5914\u5915\u5916\u5919\u591a\u591c\u591f\u5920\u5922\u5924\u5925\u5927\u5929\u592a\u592b\u592c\u592d\u592e\u592f\u5931\u5932\u5937\u5938\u5939\u593a\u593c\u593e\u5940\u5942\u5944\u5946\u5947\u5948\u5949\u594b\u594e\u594f\u5950\u5951\u5954\u5955\u5956\u5957\u5958\u595a\u595b\u5960\u5962\u5965\u5967\u5968\u5969\u596a\u596c\u596e\u5970\u5971\u5973\u5974\u5976\u5978\u5979\u597d\u5980\u5981\u5982\u5984\u5986\u5987\u5988\u598a\u598d\u598e\u598f\u5990\u5992\u5993\u5996\u5997\u5998\u5999\u599b\u599d\u599e\u59a0\u59a1\u59a2\u59a3\u59a4\u59a5\u59a6\u59a7\u59a8\u59a9\u59aa\u59ac\u59ae\u59af\u59b2\u59b3\u59b4\u59b9\u59bb\u59be\u59c3\u59c6\u59c7\u59c9\u59ca\u59cb\u59cd\u59d0\u59d1\u59d2\u59d3\u59d4\u59d7\u59d8\u59d9\u59da\u59dc\u59dd\u59de\u59e0\u59e3\u59e4\u59e5\u59e8\u59ea\u59eb\u59ec\u59ee\u59f1\u59f2\u59f3\u59f5\u59f6\u59f7\u59f9\u59fa\u59fb\u59fc\u59fd\u59fe\u59ff\u5a00\u5a01\u5a03\u5a04\u5a05\u5a06\u5a07\u5a08\u5a09\u5a0a\u5a0b\u5a0c\u5a0d\u5a0e\u5a11\u5a13\u5a15\u5a16\u5a18\u5a1a\u5a1b\u5a1c\u5a1d\u5a1e\u5a1f\u5a20\u5a23\u5a25\u5a29\u5a2a\u5a2b\u5a2c\u5a2d\u5a2e\u5a2f\u5a30\u5a31\u5a32\u5a33\u5a34\u5a35\u5a36\u5a37\u5a38\u5a39\u5a3a\u5a3b\u5a3c\u5a3d\u5a3e\u5a40\u5a41\u5a46\u5a47\u5a49\u5a4a\u5a4b\u5a4c\u5a4d\u5a4e\u5a4f\u5a50\u5a51\u5a52\u5a53\u5a54\u5a55\u5a56\u5a57\u5a58\u5a59\u5a5a\u5a5b\u5a5c\u5a5d\u5a5e\u5a5f\u5a60\u5a61\u5a62\u5a63\u5a64\u5a65\u5a66\u5a67\u5a68\u5a69\u5a6a\u5a6b\u5a6c\u5a6d\u5a6e\u5a6f\u5a70\u5a71\u5a72\u5a73\u5a74\u5a75\u5a76\u5a77\u5a78\u5a79\u5a7a\u5a7b\u5a7c\u5a7d\u5a7e\u5a7f\u5a80\u5a81\u5a82\u5a83\u5a84\u5a85\u5a86\u5a87\u5a88\u5a89\u5a8a\u5a8b\u5a8c\u5a8d\u5a8e\u5a8f\u5a90\u5a91\u5a92\u5a93\u5a94\u5a95\u5a96\u5a97\u5a98\u5a99\u5a9a\u5a9b\u5a9c\u5a9d\u5a9e\u5a9f\u5aa0\u5aa1\u5aa2\u5aa3\u5aa4\u5aa5\u5aa6\u5aa7\u5aa8\u5aa9\u5aaa\u5aab\u5aac\u5aad\u5aae\u5aaf\u5ab0\u5ab1\u5ab2\u5ab3\u5ab4\u5ab5\u5ab6\u5ab7\u5ab8\u5ab9\u5aba\u5abb\u5abc\u5abd\u5abe\u5abf\u5ac0\u5ac1\u5ac2\u5ac3\u5ac4\u5ac5\u5ac6\u5ac7\u5ac8\u5ac9\u5aca\u5acb\u5acc\u5acd\u5ace\u5acf\u5ad0\u5ad1\u5ad2\u5ad3\u5ad4\u5ad5\u5ad6\u5ad7\u5ad8\u5ad9\u5ada\u5adb\u5adc\u5add\u5ade\u5adf\u5ae0\u5ae1\u5ae2\u5ae3\u5ae4\u5ae5\u5ae6\u5ae7\u5ae8\u5ae9\u5aea\u5aeb\u5aec\u5aed\u5aee\u5aef\u5af0\u5af1\u5af2\u5af3\u5af4\u5af5\u5af6\u5af7\u5af8\u5af9\u5afa\u5afb\u5afc\u5afd\u5afe\u5aff\u5b00\u5b01\u5b02\u5b03\u5b04\u5b05\u5b06\u5b07\u5b08\u5b09\u5b0a\u5b0b\u5b0c\u5b0d\u5b0e\u5b0f\u5b10\u5b11\u5b12\u5b13\u5b14\u5b15\u5b16\u5b17\u5b18\u5b19\u5b1a\u5b1b\u5b1c\u5b1d\u5b1e\u5b1f\u5b20\u5b21\u5b22\u5b23\u5b24\u5b25\u5b26\u5b27\u5b28\u5b29\u5b2a\u5b2b\u5b2c\u5b2d\u5b2e\u5b2f\u5b30\u5b31\u5b32\u5b33\u5b34\u5b35\u5b36\u5b37\u5b38\u5b39\u5b3a\u5b3b\u5b3c\u5b3d\u5b3e\u5b3f\u5b40\u5b41\u5b42\u5b43\u5b44\u5b45\u5b46\u5b47\u5b48\u5b49\u5b4a\u5b4b\u5b4c\u5b4d\u5b4e\u5b4f\u5b50\u5b51\u5b52\u5b53\u5b54\u5b55\u5b56\u5b57\u5b58\u5b59\u5b5a\u5b5b\u5b5c\u5b5d\u5b5e\u5b5f\u5b60\u5b61\u5b62\u5b63\u5b64\u5b65\u5b66\u5b67\u5b68\u5b69\u5b6a\u5b6b\u5b6c\u5b6d\u5b6e\u5b6f\u5b70\u5b71\u5b72\u5b73\u5b74\u5b75\u5b76\u5b77\u5b78\u5b79\u5b7a\u5b7b\u5b7c\u5b7d\u5b7e\u5b7f\u5b80\u5b81\u5b82\u5b83\u5b84\u5b85\u5b86\u5b87\u5b88\u5b89\u5b8a\u5b8b\u5b8c\u5b8d\u5b8e\u5b8f\u5b90\u5b91\u5b92\u5b93\u5b94\u5b95\u5b96\u5b97\u5b98\u5b99\u5b9a\u5b9b\u5b9c\u5b9d\u5b9e\u5b9f]/
+  ];
+  let count = 0;
+  for (const re of tradRanges) {
+    count += (text.match(re) || []).length;
+  }
+  return count;
+}
+
+// ========================
+//  PREVIEW
+// ========================
+document.querySelectorAll('.preview-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.preview-pane').forEach(p => p.classList.add('hidden'));
+    document.getElementById(tab.dataset.pane).classList.remove('hidden');
+  });
+});
+
+function showPreview(pane, text) {
+  const el = pane === 'original' ? originalPane : resultPane;
+  el.textContent = text;
+  updateCounts();
+}
+
+function updateCounts() {
+  const orig = state.rawText || '';
+  const result = state.processedText || '';
+  origCount.textContent = orig.length.toLocaleString() + ' 字';
+  resultCount.textContent = result.length.toLocaleString() + ' 字';
+  updateStats(state.rawText);
+}
+
+function clearResult() {
+  state.processedText = '';
+  resultPane.textContent = '';
+  resultPane.innerHTML = '<div class="placeholder"><span class="big-icon">&#x2699;&#xFE0F;</span>执行处理后，结果将在此显示</div>';
+  btnDownload.disabled = true;
+  btnCopyResult.disabled = true;
+  updateCounts();
+}
+
+// ========================
+//  TOOL CARD COLLAPSE
+// ========================
+document.querySelectorAll('[data-toggle]').forEach(header => {
+  header.addEventListener('click', () => {
+    const body = document.getElementById(header.dataset.toggle);
+    body.classList.toggle('hidden');
+    header.querySelector('.toggle-indicator').classList.toggle('collapsed');
+  });
+});
+
+// ========================
+//  CHECKBOX TOGGLE
+// ========================
+document.querySelectorAll('.checkbox-item').forEach(item => {
+  item.addEventListener('click', () => {
+    item.classList.toggle('active');
+    item.querySelector('input').checked = item.classList.contains('active');
+  });
+});
+
+// ========================
+//  PROCESSING
+// ========================
+async function processText() {
+  if (!state.rawText || state.isProcessing) return;
+  state.isProcessing = true;
+  processingOverlay.classList.add('active');
+
+  // Use setTimeout to allow UI to update
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    let text = state.rawText;
+
+    // Step 1: Simplified-Traditional conversion
+    const convDirection = document.getElementById('convDirection').value;
+    try {
+      if (typeof OpenCC !== 'undefined') {
+        const converter = OpenCC.Converter({ from: convDirection.slice(0, 2), to: convDirection.slice(2) });
+        text = converter(text);
+      }
+    } catch (e) {
+      console.warn('OpenCC conversion failed:', e);
+    }
+
+    // Step 2: Cleaning
+    const cleanChecks = document.querySelectorAll('#cleanBody .checkbox-item.active');
+    cleanChecks.forEach(item => {
+      const val = item.dataset.val;
+      switch (val) {
+        case 'removeBlankLines':
+          text = text.replace(/^\s*[\r\n]/gm, '');
+          break;
+        case 'removeExtraSpaces':
+          text = text.replace(/[ \t]+/g, ' ').replace(/^ +| +$/gm, '');
+          break;
+        case 'removeExtraNewlines':
+          text = text.replace(/\n{3,}/g, '\n\n');
+          break;
+        case 'normalizePunct':
+          text = normalizePunctuation(text);
+          break;
+        case 'removeSpecialChars':
+          text = text.replace(/[^\u4e00-\u9fff\u3400-\u4dbf\uff00-\uffef\u3000-\u303f\u0020-\u007e\u00a0-\u00ff\n\r\t]/g, '');
+          break;
+        case 'trimLines':
+          text = text.split('\n').map(l => l.trim()).join('\n');
+          break;
+        case 'removeUrls':
+          text = text.replace(/https?:\/\/[^\s\n\r，。、；：！？）》」】』】]+/gi, '');
+          break;
+        case 'removeEmails':
+          text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
+          break;
+      }
+    });
+
+    // Step 3: Removal
+    const removeChecks = document.querySelectorAll('#removeBody .checkbox-item.active');
+    removeChecks.forEach(item => {
+      const val = item.dataset.val;
+      switch (val) {
+        case 'removeHtmlTags':
+          text = text.replace(/<[^>]*>/g, '');
+          break;
+        case 'removeNumbers':
+          text = text.replace(/[0-9]+/g, '');
+          break;
+        case 'removeEnglish':
+          text = text.replace(/[a-zA-Z]+/g, '');
+          break;
+        case 'removePunctuation':
+          text = text.replace(/[\u3000-\u303f\uff00-\uffef\u0021-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e\u00a1-\u00bf\u2000-\u206f]/g, '');
+          break;
+      }
+    });
+
+    // Custom patterns
+    const customPatterns = document.getElementById('customRemovePatterns').value;
+    const useRegex = document.getElementById('useRegex').checked;
+    if (customPatterns.trim()) {
+      const lines = customPatterns.split('\n').filter(l => l.trim());
+      for (const pattern of lines) {
+        try {
+          if (useRegex) {
+            const re = new RegExp(pattern, 'g');
+            text = text.replace(re, '');
+          } else {
+            // Escape special regex chars
+            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            text = text.replace(new RegExp(escaped, 'g'), '');
+          }
+        } catch (e) {
+          console.warn('Pattern failed:', pattern, e);
+        }
+      }
+    }
+
+    state.processedText = text;
+    return text;
+  } finally {
+    state.isProcessing = false;
+    processingOverlay.classList.remove('active');
+  }
+}
+
+function normalizePunctuation(text) {
+  const map = {
+    '，': ',', '。': '.', '；': ';', '：': ':', '！': '!', '？': '?',
+    '（': '(', '）': ')', '【': '[', '】': ']', '「': '"', '」': '"',
+    '『': "'", '』': "'", '《': '<', '》': '>',
+    '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
+    '\u2014': '-', '\u2013': '-', '\u2026': '...',
+    '\u3000': ' ', '\u00a0': ' ',
+  };
+  let result = '';
+  for (const ch of text) {
+    result += map[ch] || ch;
+  }
+  return result;
+}
+
+// ========================
+//  BUTTON HANDLERS
+// ========================
+btnProcessAll.addEventListener('click', async () => {
+  if (!state.rawText) return;
+  const result = await processText();
+  if (result !== undefined) {
+    showPreview('result', result);
+    btnDownload.disabled = false;
+    btnCopyResult.disabled = false;
+    // Switch to result tab
+    document.querySelectorAll('.preview-tab')[1].click();
+    showToast('处理完成！', 'success');
+  }
+});
+
+btnResetPreview.addEventListener('click', () => {
+  clearResult();
+  document.querySelectorAll('.preview-tab')[0].click();
+  showToast('已重置，可重新处理', 'success');
+});
+
+btnDownload.addEventListener('click', () => {
+  if (!state.processedText) return;
+  const text = state.processedText;
+  const ext = state.fileName.split('.').pop() || 'txt';
+  const baseName = state.fileName.replace(/\.[^.]+$/, '');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = baseName + '_processed.' + ext;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('文件已下载：' + a.download, 'success');
+});
+
+btnCopyResult.addEventListener('click', async () => {
+  if (!state.processedText) return;
+  try {
+    await navigator.clipboard.writeText(state.processedText);
+    showToast('已复制到剪贴板', 'success');
+  } catch {
+    showToast('复制失败，请手动选择文本复制', 'error');
+  }
+});
+
+document.getElementById('btnTogglePreviewMode').addEventListener('click', () => {
+  // Simple toggle between split and single view
+  const panes = document.querySelectorAll('.preview-pane');
+  const tabs = document.querySelectorAll('.preview-tab');
+  const isSplit = panes[0].classList.contains('hidden') === false && panes[1].classList.contains('hidden') === false;
+  if (isSplit) {
+    // Show only active tab
+    tabs.forEach((t, i) => {
+      t.style.display = '';
+      panes[i].classList.remove('hidden');
+    });
+    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.preview-pane').forEach(p => p.classList.add('hidden'));
+    document.querySelector('.preview-tab').classList.add('active');
+    document.getElementById('originalPane').classList.remove('hidden');
+  }
+  // If not in split mode, this is a no-op toggle
+});
+
+// ========================
+//  TOAST
+// ========================
+function showToast(msg, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = msg;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = '0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+// ========================
+//  KEYBOARD SHORTCUTS
+// ========================
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    btnProcessAll.click();
+  }
+});
+
+console.log('📖 文简书斋 loaded — 所有处理在浏览器本地完成');
+</script>
 </body>
 </html>
