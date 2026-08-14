@@ -1017,6 +1017,33 @@ function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// 文件名净化：移除路径分隔符、非法字符与控制字符，保留中文与扩展名
+function sanitizeFilename(name) {
+  var s = String(name || '');
+  s = s.replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, '');
+  s = s.replace(/^[\s.]+|[\s.]+$/g, '');
+  var maxLen = 100;
+  if (s.length > maxLen) {
+    var m = s.match(/\.([^.]+)$/);
+    var ext = m ? m[1] : '';
+    s = s.slice(0, maxLen - ext.length - 1) + '.' + ext;
+  }
+  return s || 'file';
+}
+
+function decodeFilename(name) {
+  var s = String(name || '');
+  if (/%[0-9a-fA-F]{2}/.test(s)) {
+    try {
+      var d = decodeURIComponent(s);
+      if (d.indexOf('\uFFFD') === -1) s = d;
+    } catch (e) { /* 非 URL 编码则保持原样 */ }
+  }
+  return s;
+}
+
+
+
 function isCJKChar(ch) {
   var code = ch.charCodeAt(0);
   return (code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3400 && code <= 0x4dbf);
@@ -1275,7 +1302,7 @@ function handleFile(file) {
     return;
   }
 
-  state.fileName = file.name;
+  state.fileName = sanitizeFilename(decodeFilename(file.name));
   state.fileSize = file.size;
   state.undoStack = [];
   state.redoStack = [];
@@ -1645,6 +1672,7 @@ btnDownload.addEventListener('click', function () {
 // 2) 系统分享（移动端 Android/iOS，可保存到文件管理器 / 存储到文件）
 // 3) 传统浏览器下载（blob + a.download）+ 引导卡片
 async function downloadFile(data, filename, mime) {
+  filename = sanitizeFilename(filename);
   mime = mime || 'text/plain;charset=utf-8';
   var ext = filename.split('.').pop() || 'txt';
 
@@ -1885,8 +1913,9 @@ btnBatchProcess.addEventListener('click', async function () {
     if (typeof JSZip !== 'undefined') {
       var zip = new JSZip();
       results.forEach(function (r) {
-        var base = r.name.replace(/\.[^.]+$/, '');
-        var ext = r.name.split('.').pop() || 'txt';
+        var safeName = sanitizeFilename(decodeFilename(r.name));
+        var base = safeName.replace(/\.[^.]+$/, '');
+        var ext = safeName.split('.').pop() || 'txt';
         zip.file(base + '_processed.' + ext, r.text);
       });
       var blob = await zip.generateAsync({ type: 'blob' });
@@ -1895,8 +1924,9 @@ btnBatchProcess.addEventListener('click', async function () {
       downloadFile(blob, zipName, 'application/zip');
     } else {
       results.forEach(function (r) {
-        var base = r.name.replace(/\.[^.]+$/, '');
-        var ext = r.name.split('.').pop() || 'txt';
+        var safeName = sanitizeFilename(decodeFilename(r.name));
+        var base = safeName.replace(/\.[^.]+$/, '');
+        var ext = safeName.split('.').pop() || 'txt';
         downloadFile(r.text, base + '_processed.' + ext);
       });
       showToast('批量处理完成（JSZip 未加载，已逐个下载）', 'success');
