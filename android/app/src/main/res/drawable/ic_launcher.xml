@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 深色背景圆角 -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M20,4h68a16,16 0 0 1 16,16v68a16,16 0 0 1 -16,16h-68a16,16 0 0 1 -16,-16v-68a16,16 0 0 1 16,-16z" />
+    <!-- 金色书封 -->
+    <path
+        android:fillColor="#C9A96E"
+        android:pathData="M26,30h56a5,5 0 0 1 5,5v46a5,5 0 0 1 -5,5h-56a5,5 0 0 1 -5,-5v-46a5,5 0 0 1 5,-5z" />
+    <!-- 书脊阴影 -->
+    <path
+        android:fillColor="#A88A4E"
+        android:pathData="M52,30h4v56h-4z" />
+    <!-- 标题线 -->
+    <path
+        android:fillColor="#F5F0E6"
+        android:pathData="M34,42h22v3h-22z" />
+    <!-- 正文线 -->
+    <path
+        android:fillColor="#F5F0E6"
+        android:pathData="M34,52h30v3h-30z M34,61h26v3h-26z M34,70h18v3h-18z" />
+    <!-- 文简印章点缀 -->
+    <path
+        android:fillColor="#E0553A"
+        android:pathData="M66,66h16a4,4 0 0 1 4,4v10a4,4 0 0 1 -4,4h-16a4,4 0 0 1 -4,-4v-10a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#F5F0E6"
+        android:pathData="M70,71h8v2h-8z M70,76h8v2h-8z" />
+</vector>

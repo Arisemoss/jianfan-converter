@@ -11,12 +11,23 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            // keystore 由 CI 从 Secrets 解码到 android/keystore/ 下；本地构建可自行放置
+            storeFile file("keystore/release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "android"
+            keyAlias System.getenv("KEY_ALIAS") ?: "wenjian"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "android"
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
