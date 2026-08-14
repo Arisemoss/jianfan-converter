@@ -2,12 +2,6 @@ name: Build APK
 
 on:
   push:
-    paths:
-      - 'android/**'
-      - 'ebook-tool.html'
-      - '.github/workflows/build-apk.yml'
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
