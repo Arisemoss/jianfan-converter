@@ -531,6 +531,74 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 .processing-card p { font-size: 14px; color: var(--warm-gray); }
 .processing-card .overlay-progress { width: 100%; margin-top: 12px; }
 
+/* ===== DOWNLOAD GUIDE ===== */
+.download-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 12, 10, 0.65);
+  backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 210;
+}
+.download-overlay.active { display: flex; }
+.download-card {
+  background: var(--paper-light);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 420px; width: 92%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  animation: cardIn 0.25s ease;
+}
+@keyframes cardIn {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.download-card .dl-icon {
+  font-size: 44px;
+  text-align: center;
+  display: block;
+  margin-bottom: 8px;
+}
+.download-card h3 {
+  font-family: 'Noto Serif SC', serif;
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.download-filename {
+  text-align: center;
+  font-size: 13px;
+  color: var(--gold-dark);
+  background: var(--paper-dark);
+  padding: 6px 10px;
+  border-radius: 6px;
+  word-break: break-all;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.download-hint {
+  font-size: 13px;
+  color: var(--ink-light);
+  margin-bottom: 8px;
+}
+.download-tips {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+}
+.download-tips li {
+  font-size: 12px;
+  color: var(--warm-gray);
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  line-height: 1.6;
+}
+.download-tips li:last-child { border-bottom: none; }
+.download-tips li::before { content: '📍'; flex-shrink: 0; }
+.download-card .btn { width: 100%; justify-content: center; }
+
 /* ===== TOAST ===== */
 .toast-container {
   position: fixed; bottom: 24px; right: 24px;
@@ -859,6 +927,18 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   </div>
 </div>
 
+<!-- Download Guide -->
+<div class="download-overlay" id="downloadOverlay">
+  <div class="download-card">
+    <span class="dl-icon">&#x2705;</span>
+    <h3>下载完成</h3>
+    <div class="download-filename" id="dlFileName">-</div>
+    <p class="download-hint" id="dlHint"></p>
+    <ul class="download-tips" id="dlTips"></ul>
+    <button class="btn btn-primary" id="btnDownloadClose">知道了</button>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -911,6 +991,10 @@ var processingText = $('processingText');
 var overlayProgressBar = $('overlayProgressBar');
 var toastContainer = $('toastContainer');
 var themeToggle = $('themeToggle');
+var downloadOverlay = $('downloadOverlay');
+var dlFileName = $('dlFileName');
+var dlHint = $('dlHint');
+var dlTips = $('dlTips');
 
 // ========================
 //  CORE PURE FUNCTIONS (testable)
@@ -1556,7 +1640,28 @@ btnDownload.addEventListener('click', function () {
   downloadTextFile(text, baseName + '_processed.' + ext);
 });
 
-function downloadTextFile(text, filename) {
+// 优先使用 File System Access API（Chrome/Edge 桌面版）：让用户明确选择保存位置
+// 不支持或用户取消时回退到传统下载 + 引导提示
+async function downloadTextFile(text, filename) {
+  if (window.showSaveFilePicker) {
+    try {
+      var handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: '文本文件',
+          accept: { 'text/plain': ['.txt', '.html', '.htm', '.md', '.csv', '.json', '.xml'] }
+        }]
+      });
+      var writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      showToast('已保存：' + handle.name, 'success');
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // 用户取消保存对话框
+      console.warn('showSaveFilePicker failed, fallback to download:', e);
+    }
+  }
   var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -1566,8 +1671,62 @@ function downloadTextFile(text, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('文件已下载：' + filename, 'success');
+  showToast('已开始下载：' + filename, 'success');
+  showDownloadGuide(filename);
 }
+
+// ========================
+//  DOWNLOAD GUIDE
+// ========================
+function detectPlatform() {
+  var ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+
+var PLATFORM_TIPS = {
+  desktop: {
+    hint: '文件已保存到浏览器的默认下载目录。',
+    tips: [
+      'Chrome / Edge：按 Ctrl+J 打开「下载内容」查看',
+      'Firefox：按 Ctrl+Shift+Y 打开下载列表',
+      '可在浏览器设置中修改默认下载位置'
+    ]
+  },
+  android: {
+    hint: '文件已保存到手机「下载」(Download) 文件夹。',
+    tips: [
+      '下拉通知栏可看到下载完成提醒，点按即可打开',
+      '或打开「文件管理」应用 → 「下载 / Download」文件夹',
+      '不同浏览器保存位置略有差异，也可在浏览器设置中查看下载路径'
+    ]
+  },
+  ios: {
+    hint: '文件已保存到浏览器的下载列表。',
+    tips: [
+      '点地址栏右侧的下载图标 ⬇️ 打开下载列表',
+      '点击文件名可预览；长按文件可选择「存储到文件」'
+    ]
+  }
+};
+
+function showDownloadGuide(filename) {
+  var info = PLATFORM_TIPS[detectPlatform()] || PLATFORM_TIPS.desktop;
+  dlFileName.textContent = filename;
+  dlHint.textContent = info.hint;
+  dlTips.innerHTML = '';
+  info.tips.forEach(function (tip) {
+    var li = document.createElement('li');
+    li.textContent = tip;
+    dlTips.appendChild(li);
+  });
+  downloadOverlay.classList.add('active');
+}
+
+$('btnDownloadClose').addEventListener('click', function () {
+  downloadOverlay.classList.remove('active');
+});
 
 btnCopyResult.addEventListener('click', async function () {
   if (!state.processedText) return;
@@ -1711,15 +1870,17 @@ btnBatchProcess.addEventListener('click', async function () {
         zip.file(base + '_processed.' + ext, r.text);
       });
       var blob = await zip.generateAsync({ type: 'blob' });
+      var zipName = 'batch_processed_' + Date.now() + '.zip';
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
-      a.download = 'batch_processed_' + Date.now() + '.zip';
+      a.download = zipName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast('批量处理完成，已下载 ZIP（' + results.length + ' 个文件）', 'success');
+      showDownloadGuide(zipName);
     } else {
       results.forEach(function (r) {
         var base = r.name.replace(/\.[^.]+$/, '');
