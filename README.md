@@ -6,7 +6,19 @@
 
 ## 快速开始
 
-直接用浏览器打开 [ebook-tool.html](ebook-tool.html) 即可，无需安装、无需构建。
+- **浏览器**：直接用浏览器打开 [ebook-tool.html](ebook-tool.html)，无需安装、无需构建
+- **Android APK**：查看 GitHub Actions「Build APK」工作流的产物（Actions → 最新运行 → Artifacts → 下载 wenjian-shuzhai-debug-apk），或在仓库 android/ 目录本地构建
+
+## Android APK
+
+android/ 目录是一个零第三方依赖的手写 WebView 壳：
+
+- MainActivity.java 加载 assets/ebook-tool.html，支持文件上传（系统文件选择器）
+- **原生下载桥接** AndroidBridge.saveText()：文件直接保存到系统「下载」目录，文件名完全可控，不存在 WebView 中 blob 下载产生随机文件名的问题
+- 完全离线可用（HTML 已内嵌 OpenCC 词典）
+- 本地构建：cd android && ./gradlew assembleDebug（需 JDK 17 + Android SDK）
+- CI 构建：push 自动触发 .github/workflows/build-apk.yml，产物为 workflow artifact
+
 
 ## 功能
 
