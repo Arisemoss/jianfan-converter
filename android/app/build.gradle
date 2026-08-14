@@ -16,8 +16,8 @@ android {
 
     signingConfigs {
         release {
-            // keystore 由 CI 从 Secrets 解码到 android/keystore/ 下；本地构建可自行放置
-            storeFile file("keystore/release.keystore")
+            // keystore 由 CI 从 Secrets 解码到 android/keystore/ 下（相对 app 模块为 ../keystore/）
+            storeFile file("../keystore/release.keystore")
             storePassword System.getenv("KEYSTORE_PASSWORD") ?: "android"
             keyAlias System.getenv("KEY_ALIAS") ?: "wenjian"
             keyPassword System.getenv("KEY_PASSWORD") ?: "android"
