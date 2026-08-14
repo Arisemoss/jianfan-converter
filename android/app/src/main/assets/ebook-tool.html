@@ -740,7 +740,14 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
         <span class="toggle-indicator">&#x25BC;</span>
       </div>
       <div class="tool-card-body" id="convBody">
-        <div class="option-group">
+        <div class="toggle-wrap" style="margin-bottom:12px;">
+          <span class="toggle-label">启用简繁转换</span>
+          <label class="toggle">
+            <input type="checkbox" id="convEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="option-group" id="convOptions">
           <div class="option-label">转换方向</div>
           <select class="styled-select" id="convDirection">
             <option value="s2t">简体 &#x2192; 繁体</option>
@@ -1264,6 +1271,8 @@ function loadSettings() {
     s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
   } catch (e) { s = {}; }
   if (s.convDirection) $('convDirection').value = s.convDirection;
+  if (s.convEnabled !== undefined) $('convEnabled').checked = s.convEnabled;
+  updateConvUI();
   if (s.useRegex !== undefined) $('useRegex').checked = s.useRegex;
   if (s.customPatterns !== undefined) $('customRemovePatterns').value = s.customPatterns;
   if (s.theme) applyTheme(s.theme);
@@ -1283,6 +1292,7 @@ function saveSettings() {
   try {
     var s = {
       convDirection: $('convDirection').value,
+      convEnabled: $('convEnabled').checked,
       useRegex: $('useRegex').checked,
       customPatterns: $('customRemovePatterns').value,
       theme: document.documentElement.dataset.theme || 'light',
@@ -1611,6 +1621,7 @@ async function processText() {
     pushUndo();
 
     var convDirection = $('convDirection').value;
+    var convEnabled = $('convEnabled').checked;
     var cleanVals = getCleanVals();
     var removeVals = getRemoveVals();
     var customPatterns = $('customRemovePatterns').value;
@@ -1618,9 +1629,9 @@ async function processText() {
 
     var result = state.rawText;
 
-    // 阶段 1+2+3：简繁转换 + 行级净化 + 去除（分块执行，避免大文件卡死 UI）
+    // 阶段 1+2+3：简繁转换（可开关）+ 行级净化 + 去除（分块执行，避免大文件卡死 UI）
     result = await processChunks(result, function (chunk) {
-      var t = convertText(chunk, convDirection);
+      var t = convEnabled ? convertText(chunk, convDirection) : chunk;
       t = cleanText(t, cleanVals);
       t = removeText(t, removeVals, customPatterns, useRegex);
       return t;
@@ -1968,6 +1979,7 @@ btnBatchProcess.addEventListener('click', async function () {
   batchProgressText.textContent = '准备中...';
 
   var convDirection = $('convDirection').value;
+  var convEnabled = $('convEnabled').checked;
   var cleanVals = getCleanVals();
   var removeVals = getRemoveVals();
   var customPatterns = $('customRemovePatterns').value;
@@ -1983,7 +1995,7 @@ btnBatchProcess.addEventListener('click', async function () {
     try {
       var text = await readFileText(entry.file);
       var processed = await processChunks(text, function (chunk) {
-        var t = convertText(chunk, convDirection);
+        var t = convEnabled ? convertText(chunk, convDirection) : chunk;
         t = cleanText(t, cleanVals);
         t = removeText(t, removeVals, customPatterns, useRegex);
         return t;
@@ -2092,6 +2104,18 @@ document.addEventListener('keydown', function (e) {
 });
 
 // ========================
+//  CONVERSION TOGGLE
+// ========================
+function updateConvUI() {
+  var enabled = $('convEnabled').checked;
+  $('convDirection').disabled = !enabled;
+  var opts = $('convOptions');
+  if (opts) opts.style.opacity = enabled ? '' : '0.5';
+  var badge = $('convEngine');
+  if (badge) badge.style.opacity = enabled ? '' : '0.5';
+}
+
+// ========================
 //  ENGINE STATUS
 // ========================
 function updateEngineBadge() {
@@ -2112,6 +2136,10 @@ function updateEngineBadge() {
 loadSettings();
 updateEngineBadge();
 $('convDirection').addEventListener('change', saveSettings);
+$('convEnabled').addEventListener('change', function () {
+  updateConvUI();
+  saveSettings();
+});
 $('useRegex').addEventListener('change', saveSettings);
 $('customRemovePatterns').addEventListener('input', saveSettings);
 $('findRegex').addEventListener('change', function () { $('findResult').textContent = '替换会作用于「处理后文本」，可撤销'; });
