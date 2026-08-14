@@ -1,13 +1,16 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>文简书斋 · 电子书处理工具</title>
+<meta name="description" content="简繁转换、文本净化、自定义去除、查找替换、批量处理 —— 所有处理在浏览器本地完成">
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
+/* ===== THEME ===== */
 :root {
   --ink: #1a1a1a;
   --ink-light: #2d2d2d;
@@ -26,65 +29,95 @@
   --radius: 12px;
   --radius-sm: 8px;
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --bg-tex: radial-gradient(circle at 15% 10%, rgba(201,169,110,0.05), transparent 40%), radial-gradient(circle at 85% 90%, rgba(194,59,34,0.04), transparent 40%);
+  --pane-bg: #ffffff;
+  --input-bg: #ffffff;
+  --toast-bg: #1a1a1a;
+  --toast-fg: #f5f0e6;
+  --header-bg: #1a1a1a;
+  --header-fg: #f5f0e6;
+}
+[data-theme="dark"] {
+  --ink: #e8e0d4;
+  --ink-light: #c9bfae;
+  --paper: #16130f;
+  --paper-light: #1e1a15;
+  --paper-dark: #2a241d;
+  --vermillion: #d04a33;
+  --vermillion-light: #e2604a;
+  --gold: #c9a96e;
+  --gold-light: #dfc08a;
+  --gold-dark: #a88a4e;
+  --warm-gray: #9a8d7c;
+  --warm-gray-light: #665c4e;
+  --border: #3a332b;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --bg-tex: radial-gradient(circle at 15% 10%, rgba(201,169,110,0.06), transparent 40%), radial-gradient(circle at 85% 90%, rgba(194,59,34,0.05), transparent 40%);
+  --pane-bg: #201b16;
+  --input-bg: #262019;
+  --toast-bg: #f5f0e6;
+  --toast-fg: #1a1a1a;
+  --header-bg: #0d0b09;
+  --header-fg: #f5f0e6;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
 body {
-  font-family: 'Noto Sans SC', -apple-system, sans-serif;
+  font-family: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--paper);
+  background-image: var(--bg-tex);
   color: var(--ink);
   min-height: 100vh;
   line-height: 1.6;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* ========== HEADER ========== */
+::selection { background: rgba(201, 169, 110, 0.35); }
+
+/* ===== HEADER ===== */
 .header {
-  background: var(--ink);
-  color: var(--paper);
-  padding: 0;
+  background: var(--header-bg);
+  color: var(--header-fg);
   position: sticky;
   top: 0;
   z-index: 100;
   box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+  transition: background-color 0.4s ease;
 }
 .header-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 18px 32px;
+  padding: 14px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
+.header-left { display: flex; align-items: center; gap: 16px; }
 .header-icon {
-  width: 40px;
-  height: 40px;
-  background: var(--gold);
-  border-radius: 8px;
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(201,169,110,0.3);
 }
 .header-title {
   font-family: 'Noto Serif SC', serif;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.05em;
+  line-height: 1.2;
 }
 .header-title span { color: var(--gold); }
-.header-sub {
-  font-size: 12px;
-  color: var(--warm-gray-light);
-  letter-spacing: 0.1em;
-  margin-top: -1px;
-}
+.header-sub { font-size: 12px; color: var(--warm-gray-light); letter-spacing: 0.12em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
 .header-badge {
   background: rgba(201, 169, 110, 0.15);
   border: 1px solid rgba(201, 169, 110, 0.3);
@@ -93,16 +126,28 @@ body {
   border-radius: 20px;
   font-size: 12px;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
-
-/* ========== CONTAINER ========== */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px;
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(201, 169, 110, 0.3);
+  border-radius: 50%;
+  background: rgba(201, 169, 110, 0.12);
+  color: var(--gold);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
 }
+.theme-toggle:hover { background: rgba(201, 169, 110, 0.25); transform: rotate(15deg); }
 
-/* ========== UPLOAD AREA ========== */
+/* ===== CONTAINER ===== */
+.container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+
+/* ===== UPLOAD ZONE ===== */
 .upload-zone {
   background: var(--paper-light);
   border: 2px dashed var(--border);
@@ -118,43 +163,28 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(201,169,110,0.03), rgba(194,59,34,0.02));
+  background: linear-gradient(135deg, rgba(201,169,110,0.04), rgba(194,59,34,0.02));
   opacity: 0;
   transition: var(--transition);
+  pointer-events: none;
 }
-.upload-zone:hover { border-color: var(--gold); }
+.upload-zone:hover { border-color: var(--gold); box-shadow: 0 4px 20px var(--shadow); }
 .upload-zone:hover::before { opacity: 1; }
 .upload-zone.dragover {
   border-color: var(--vermillion);
-  background: rgba(194, 59, 34, 0.03);
+  background: rgba(194, 59, 34, 0.04);
   transform: scale(1.01);
 }
-.upload-zone.has-file {
-  padding: 24px 32px;
-  border-style: solid;
-  border-color: var(--gold);
+.upload-zone.dragover .upload-icon { animation: bounce 0.6s ease infinite; }
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
-.upload-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  display: block;
-  line-height: 1;
-}
-.upload-title {
-  font-family: 'Noto Serif SC', serif;
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-.upload-desc {
-  color: var(--warm-gray);
-  font-size: 14px;
-}
-.upload-formats {
-  display: inline-flex;
-  gap: 6px;
-  margin-top: 10px;
-}
+.upload-zone.has-file { padding: 24px 32px; border-style: solid; border-color: var(--gold); }
+.upload-icon { font-size: 48px; margin-bottom: 12px; display: block; line-height: 1; }
+.upload-title { font-family: 'Noto Serif SC', serif; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.upload-desc { color: var(--warm-gray); font-size: 14px; }
+.upload-formats { display: inline-flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
 .upload-formats span {
   background: var(--paper-dark);
   padding: 2px 10px;
@@ -166,169 +196,119 @@ body {
 }
 .upload-input { display: none; }
 
-/* File info */
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-}
+.file-info { display: flex; align-items: center; gap: 14px; text-align: left; }
 .file-info-icon {
-  width: 44px;
-  height: 44px;
-  background: var(--ink);
-  color: var(--gold);
+  width: 44px; height: 44px;
+  background: var(--ink); color: var(--gold);
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
-.file-info-detail { flex: 1; }
-.file-info-name {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 2px;
-}
-.file-info-meta {
-  font-size: 12px;
-  color: var(--warm-gray);
-}
+.file-info-detail { flex: 1; min-width: 0; }
+.file-info-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; word-break: break-all; }
+.file-info-meta { font-size: 12px; color: var(--warm-gray); }
 .file-remove {
-  width: 32px;
-  height: 32px;
+  width: 32px; height: 32px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--warm-gray);
+  background: none; cursor: pointer;
+  font-size: 16px; color: var(--warm-gray);
   transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.file-remove:hover {
-  border-color: var(--vermillion);
-  color: var(--vermillion);
-}
+.file-remove:hover { border-color: var(--vermillion); color: var(--vermillion); transform: rotate(90deg); }
 
-/* ========== TOOL SECTION ========== */
-.tools-section {
-  margin-top: 28px;
+/* ===== STATS ===== */
+.stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-top: 16px;
 }
-@media (max-width: 860px) {
-  .tools-section { grid-template-columns: 1fr; }
+.stat-card {
+  background: var(--paper-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  text-align: center;
+  transition: var(--transition);
 }
+.stat-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow); }
+.stat-card .stat-label { font-size: 11px; color: var(--warm-gray); letter-spacing: 0.05em; }
+.stat-card .stat-value {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .stat-value.trad { color: var(--vermillion); }
+.stat-card .stat-value.chinese { color: var(--gold-dark); }
+
+/* ===== TOOLS GRID ===== */
+.tools-section { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 860px) { .tools-section { grid-template-columns: 1fr; } }
 
 .tool-card {
   background: var(--paper-light);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0;
   overflow: hidden;
   transition: var(--transition);
 }
-.tool-card:hover { border-color: var(--gold); }
+.tool-card:hover { border-color: var(--gold); box-shadow: 0 4px 16px var(--shadow); }
+.tool-card.span-2 { grid-column: span 2; }
+@media (max-width: 860px) { .tool-card.span-2 { grid-column: span 1; } }
+
 .tool-card-header {
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 10px;
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  user-select: none;
+  cursor: pointer; user-select: none;
+  transition: background-color 0.2s;
 }
-.tool-card-header .icon {
-  font-size: 18px;
-  width: 28px;
-  text-align: center;
-}
-.tool-card-header h3 {
-  font-family: 'Noto Serif SC', serif;
-  font-size: 15px;
-  font-weight: 600;
-  flex: 1;
-}
-.tool-card-header .toggle-indicator {
-  color: var(--warm-gray);
-  font-size: 12px;
-  transition: transform 0.3s;
-}
-.tool-card-header .toggle-indicator.collapsed {
-  transform: rotate(-90deg);
-}
-.tool-card-body {
-  padding: 16px 20px 20px;
-  transition: var(--transition);
-}
+.tool-card-header:hover { background: rgba(201, 169, 110, 0.06); }
+.tool-card-header .icon { font-size: 18px; width: 28px; text-align: center; }
+.tool-card-header h3 { font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 600; flex: 1; }
+.tool-card-header .toggle-indicator { color: var(--warm-gray); font-size: 12px; transition: transform 0.3s; }
+.tool-card-header .toggle-indicator.collapsed { transform: rotate(-90deg); }
+.tool-card-body { padding: 16px 20px 20px; transition: var(--transition); }
 .tool-card-body.hidden { display: none; }
 
-/* ========== OPTIONS ========== */
+/* ===== OPTIONS ===== */
 .option-group { margin-bottom: 14px; }
 .option-group:last-child { margin-bottom: 0; }
 .option-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 6px;
-  color: var(--ink-light);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500;
+  margin-bottom: 6px; color: var(--ink-light);
 }
 .option-label .badge {
   font-size: 10px;
   background: var(--paper-dark);
   color: var(--warm-gray);
-  padding: 0 6px;
-  border-radius: 3px;
-  font-weight: 400;
+  padding: 0 6px; border-radius: 3px; font-weight: 400;
 }
 
-/* Toggle switch */
-.toggle-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.toggle-label {
-  font-size: 13px;
-  color: var(--ink-light);
-  flex: 1;
-}
-.toggle {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
+/* Toggle */
+.toggle-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.toggle-label { font-size: 13px; color: var(--ink-light); flex: 1; }
+.toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: var(--border);
-  border-radius: 11px;
-  cursor: pointer;
+  border-radius: 11px; cursor: pointer;
   transition: var(--transition);
 }
 .toggle-slider::before {
   content: '';
-  position: absolute;
-  height: 16px;
-  width: 16px;
-  left: 3px;
-  bottom: 3px;
-  background: white;
+  position: absolute; height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background: #fff;
   border-radius: 50%;
   transition: var(--transition);
 }
@@ -341,9 +321,8 @@ body {
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: white;
-  font-size: 13px;
-  font-family: inherit;
+  background: var(--input-bg);
+  font-size: 13px; font-family: inherit;
   color: var(--ink);
   cursor: pointer;
   transition: var(--transition);
@@ -352,283 +331,196 @@ body {
   background-repeat: no-repeat;
   background-position: right 10px center;
 }
-.styled-select:focus {
-  outline: none;
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15);
-}
+.styled-select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15); }
 
-/* Checkbox */
-.checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+/* Checkbox chips */
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; cursor: pointer;
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   transition: var(--transition);
   user-select: none;
 }
-.checkbox-item:hover { border-color: var(--gold); }
+.checkbox-item:hover { border-color: var(--gold); transform: translateY(-1px); }
 .checkbox-item.active {
   border-color: var(--vermillion);
-  background: rgba(194, 59, 34, 0.05);
+  background: rgba(194, 59, 34, 0.06);
   color: var(--vermillion);
+  box-shadow: 0 2px 6px rgba(194, 59, 34, 0.12);
 }
 .checkbox-item input { display: none; }
 
-/* Custom input */
-.custom-input {
+/* Inputs */
+.custom-input, .text-input {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-family: inherit;
+  font-size: 13px; font-family: inherit;
   transition: var(--transition);
-  background: white;
+  background: var(--input-bg);
+  color: var(--ink);
 }
-.custom-input:focus {
+.custom-input:focus, .text-input:focus {
   outline: none;
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15);
 }
-.custom-input::placeholder { color: var(--warm-gray-light); }
+.custom-input::placeholder, .text-input::placeholder { color: var(--warm-gray-light); }
+textarea.custom-input { resize: vertical; min-height: 60px; }
 
-/* ========== PREVIEW SECTION ========== */
-.preview-section {
-  margin-top: 28px;
-}
-.preview-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
-}
-.preview-tab {
-  padding: 10px 24px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: var(--warm-gray);
-  position: relative;
-  transition: var(--transition);
-  font-family: inherit;
-}
-.preview-tab::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--vermillion);
-  transform: scaleX(0);
-  transition: transform 0.3s;
-}
-.preview-tab:hover { color: var(--ink); }
-.preview-tab.active {
-  color: var(--ink);
-  font-weight: 600;
-}
-.preview-tab.active::after { transform: scaleX(1); }
-.preview-tab .count {
-  font-size: 11px;
-  background: var(--paper-dark);
-  padding: 1px 6px;
-  border-radius: 8px;
-  margin-left: 4px;
-  color: var(--warm-gray);
-  font-weight: 400;
-}
-
-.preview-pane {
-  background: white;
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
-  min-height: 280px;
-  max-height: 480px;
-  overflow: auto;
-  padding: 20px;
-  font-size: 14px;
-  line-height: 1.8;
-  font-family: 'Noto Serif SC', serif;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.preview-pane::-webkit-scrollbar { width: 6px; }
-.preview-pane::-webkit-scrollbar-track { background: transparent; }
-.preview-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.preview-pane::-webkit-scrollbar-thumb:hover { background: var(--warm-gray); }
-.preview-pane.hidden { display: none; }
-.preview-pane .placeholder {
-  color: var(--warm-gray-light);
-  text-align: center;
-  padding: 60px 20px;
-  font-family: 'Noto Sans SC', sans-serif;
-}
-.preview-pane .placeholder .big-icon {
-  font-size: 40px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-/* ========== ACTION BAR ========== */
-.action-bar {
-  margin-top: 28px;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-}
-.action-bar-left { display: flex; gap: 12px; flex-wrap: wrap; }
-.action-bar-right { display: flex; gap: 12px; }
-
+/* ===== BUTTONS ===== */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 24px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 22px;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
+  font-size: 14px; font-weight: 500;
+  font-family: inherit; cursor: pointer;
   transition: var(--transition);
   text-decoration: none;
+  line-height: 1.4;
 }
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.btn-primary {
-  background: var(--vermillion);
-  color: white;
-}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--vermillion); color: #fff; }
 .btn-primary:hover:not(:disabled) {
   background: var(--vermillion-light);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(194, 59, 34, 0.25);
 }
-.btn-gold {
-  background: var(--gold);
-  color: var(--ink);
-}
+.btn-gold { background: var(--gold); color: var(--ink); }
 .btn-gold:hover:not(:disabled) {
   background: var(--gold-light);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(201, 169, 110, 0.25);
 }
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--ink);
-}
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); }
 .btn-outline:hover:not(:disabled) {
-  border-color: var(--ink);
-  background: rgba(26, 26, 26, 0.03);
+  border-color: var(--gold);
+  background: rgba(201, 169, 110, 0.08);
 }
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 12px;
-}
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-icon { padding: 8px 10px; }
 
-/* ========== STATS BAR ========== */
-.stats-bar {
-  display: flex;
-  gap: 24px;
-  margin-top: 16px;
-  padding: 14px 20px;
-  background: var(--paper-light);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
+/* ===== ACTION BAR ===== */
+.action-bar {
+  margin-top: 28px;
+  display: flex; gap: 12px; flex-wrap: wrap;
+  align-items: center; justify-content: space-between;
+}
+.action-bar-left { display: flex; gap: 10px; flex-wrap: wrap; }
+.action-bar-right { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ===== PREVIEW ===== */
+.preview-section { margin-top: 28px; }
+.preview-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); }
+.preview-tab {
+  padding: 10px 24px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none; background: none;
   color: var(--warm-gray);
+  position: relative; transition: var(--transition);
+  font-family: inherit;
 }
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.preview-tab::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 0; right: 0; height: 2px;
+  background: var(--vermillion);
+  transform: scaleX(0); transition: transform 0.3s;
 }
-.stat-item strong {
-  color: var(--ink);
-  font-weight: 600;
+.preview-tab:hover { color: var(--ink); }
+.preview-tab.active { color: var(--ink); font-weight: 600; }
+.preview-tab.active::after { transform: scaleX(1); }
+.preview-tab .count {
+  font-size: 11px;
+  background: var(--paper-dark);
+  padding: 1px 6px; border-radius: 8px;
+  margin-left: 4px; color: var(--warm-gray); font-weight: 400;
 }
+.preview-pane {
+  background: var(--pane-bg);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  min-height: 280px; max-height: 480px;
+  overflow: auto;
+  padding: 20px;
+  font-size: 14px; line-height: 1.8;
+  font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
+  white-space: pre-wrap; word-wrap: break-word;
+  transition: background-color 0.4s ease;
+}
+.preview-pane::-webkit-scrollbar { width: 8px; }
+.preview-pane::-webkit-scrollbar-track { background: transparent; }
+.preview-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.preview-pane::-webkit-scrollbar-thumb:hover { background: var(--warm-gray); }
+.preview-pane.hidden { display: none; }
+.preview-pane .placeholder { color: var(--warm-gray-light); text-align: center; padding: 60px 20px; font-family: 'Noto Sans SC', sans-serif; }
+.preview-pane .placeholder .big-icon { font-size: 40px; display: block; margin-bottom: 12px; }
 
-/* ========== TOAST ========== */
-.toast-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* ===== PROGRESS ===== */
+.progress {
+  height: 8px;
+  background: var(--paper-dark);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0 6px;
 }
-.toast {
-  background: var(--ink);
-  color: var(--paper);
-  padding: 12px 20px;
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--gold), var(--vermillion));
+  border-radius: 4px;
+  transition: width 0.15s ease;
+}
+.progress-text { font-size: 12px; color: var(--warm-gray); text-align: right; }
+
+/* ===== BATCH LIST ===== */
+.batch-list { margin: 10px 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.batch-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  animation: slideIn 0.3s ease;
-  max-width: 360px;
 }
-.toast.success { border-left: 3px solid var(--gold); }
-.toast.error { border-left: 3px solid var(--vermillion); }
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+.batch-item .b-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-item .b-size { color: var(--warm-gray); font-size: 11px; flex-shrink: 0; }
+.batch-item .b-status { flex-shrink: 0; font-size: 11px; }
+.batch-item .b-status.ok { color: var(--gold-dark); }
+.batch-item .b-status.err { color: var(--vermillion); }
+.batch-item .b-status.run { color: var(--gold); }
+.batch-item .b-remove {
+  border: none; background: none; cursor: pointer;
+  color: var(--warm-gray); font-size: 14px;
+  padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
 }
+.batch-item .b-remove:hover { color: var(--vermillion); background: rgba(194, 59, 34, 0.08); }
 
-/* ========== RESPONSIVE ========== */
-@media (max-width: 640px) {
-  .container { padding: 16px; }
-  .header-inner { padding: 14px 16px; }
-  .header-title { font-size: 18px; }
-  .header-badge { display: none; }
-  .upload-zone { padding: 32px 20px; }
-  .action-bar { flex-direction: column; align-items: stretch; }
-  .action-bar-left, .action-bar-right { justify-content: stretch; }
-  .action-bar-left .btn, .action-bar-right .btn { flex: 1; justify-content: center; }
-  .stats-bar { flex-wrap: wrap; gap: 12px; }
-}
-
-/* ========== PROCESSING OVERLAY ========== */
+/* ===== PROCESSING OVERLAY ===== */
 .processing-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(26, 26, 26, 0.6);
+  position: fixed; inset: 0;
+  background: rgba(15, 12, 10, 0.65);
   backdrop-filter: blur(4px);
-  display: none;
-  align-items: center;
-  justify-content: center;
+  display: none; align-items: center; justify-content: center;
   z-index: 200;
 }
 .processing-overlay.active { display: flex; }
 .processing-card {
   background: var(--paper-light);
   border-radius: var(--radius);
-  padding: 40px;
+  padding: 36px 40px;
   text-align: center;
-  max-width: 320px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  max-width: 340px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
 }
 .spinner {
-  width: 40px;
-  height: 40px;
+  width: 40px; height: 40px;
   border: 3px solid var(--border);
   border-top-color: var(--vermillion);
   border-radius: 50%;
@@ -636,33 +528,64 @@ body {
   margin: 0 auto 16px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.processing-card p {
-  font-size: 14px;
-  color: var(--warm-gray);
+.processing-card p { font-size: 14px; color: var(--warm-gray); }
+.processing-card .overlay-progress { width: 100%; margin-top: 12px; }
+
+/* ===== TOAST ===== */
+.toast-container {
+  position: fixed; bottom: 24px; right: 24px;
+  z-index: 999;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: min(360px, calc(100vw - 48px));
+}
+.toast {
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  animation: slideIn 0.3s ease;
+  opacity: 1;
+  transition: opacity 0.3s, transform 0.3s;
+  word-break: break-word;
+}
+.toast.success { border-left: 3px solid var(--gold); }
+.toast.error { border-left: 3px solid var(--vermillion); }
+.toast.info { border-left: 3px solid var(--warm-gray); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-/* ========== FOOTER ========== */
+/* ===== FOOTER ===== */
 .footer {
   text-align: center;
-  padding: 32px;
+  padding: 28px 16px 36px;
   color: var(--warm-gray);
   font-size: 12px;
   border-top: 1px solid var(--border);
   margin-top: 40px;
 }
-.footer a {
-  color: var(--gold-dark);
-  text-decoration: none;
-}
+.footer a { color: var(--gold-dark); text-decoration: none; border-bottom: 1px dashed var(--gold-dark); }
+.footer a:hover { color: var(--vermillion); }
 
-/* ========== WORD COUNT ========== */
-.word-count-badge {
-  font-size: 11px;
-  background: var(--paper-dark);
-  padding: 1px 8px;
-  border-radius: 8px;
-  color: var(--warm-gray);
-  margin-left: 6px;
+/* ===== RESPONSIVE ===== */
+@media (max-width: 960px) {
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .container { padding: 16px; }
+  .header-inner { padding: 12px 16px; }
+  .header-title { font-size: 18px; }
+  .header-badge { display: none; }
+  .upload-zone { padding: 32px 20px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .action-bar { flex-direction: column; align-items: stretch; }
+  .action-bar-left, .action-bar-right { justify-content: stretch; }
+  .action-bar-left .btn, .action-bar-right .btn { flex: 1; }
+  .preview-tab { padding: 8px 14px; }
+  .toast-container { left: 16px; right: 16px; bottom: 16px; }
 }
 </style>
 </head>
@@ -678,7 +601,10 @@ body {
         <div class="header-sub">电子书处理工作台</div>
       </div>
     </div>
-    <div class="header-badge">&#x2728; 简繁 &middot; 净化 &middot; 去除</div>
+    <div class="header-right">
+      <div class="header-badge">&#x2728; 简繁 &middot; 净化 &middot; 去除</div>
+      <button class="theme-toggle" id="themeToggle" title="切换深色/浅色模式" aria-label="切换主题">&#x1F319;</button>
+    </div>
   </div>
 </header>
 
@@ -692,9 +618,7 @@ body {
       <div class="upload-title">上传电子书文件</div>
       <div class="upload-desc">点击选择文件，或将文件拖拽到此处</div>
       <div class="upload-formats">
-        <span>TXT</span>
-        <span>HTML</span>
-        <span>MD</span>
+        <span>TXT</span><span>HTML</span><span>MD</span><span>CSV</span><span>JSON</span><span>XML</span>
       </div>
     </div>
     <div id="uploadFileInfo" style="display:none;">
@@ -711,15 +635,18 @@ body {
   </div>
 
   <!-- Stats -->
-  <div class="stats-bar" id="statsBar" style="display:none;">
-    <span class="stat-item">&#x1F4CB; 总字数：<strong id="statTotalChars">0</strong></span>
-    <span class="stat-item">&#x1F4C4; 总行数：<strong id="statTotalLines">0</strong></span>
-    <span class="stat-item">&#x1F4AD; 中文字数：<strong id="statChineseChars">0</strong></span>
-    <span class="stat-item">&#x1F524; 繁体中文字：<strong id="statTraditionalChars">0</strong></span>
+  <div class="stats-grid" id="statsBar" style="display:none;">
+    <div class="stat-card"><div class="stat-label">&#x1F4CB; 总字数</div><div class="stat-value" id="statTotalChars">0</div></div>
+    <div class="stat-card"><div class="stat-label">&#x1F4C4; 总行数</div><div class="stat-value" id="statTotalLines">0</div></div>
+    <div class="stat-card"><div class="stat-label">&#x1F4D0; 段落数</div><div class="stat-value" id="statParagraphs">0</div></div>
+    <div class="stat-card"><div class="stat-label">&#x1F4AD; 中文字数</div><div class="stat-value chinese" id="statChineseChars">0</div></div>
+    <div class="stat-card"><div class="stat-label">&#x1F524; 繁体中文字</div><div class="stat-value trad" id="statTraditionalChars">0</div></div>
+    <div class="stat-card"><div class="stat-label">&#x1F4C9; 字母数字</div><div class="stat-value" id="statOtherChars">0</div></div>
   </div>
 
   <!-- Tools -->
   <div class="tools-section">
+
     <!-- 简繁转换 -->
     <div class="tool-card">
       <div class="tool-card-header" data-toggle="convBody">
@@ -731,18 +658,22 @@ body {
         <div class="option-group">
           <div class="option-label">转换方向</div>
           <select class="styled-select" id="convDirection">
-            <option value="s2t">简体 → 繁体</option>
-            <option value="t2s" selected>繁体 → 简体</option>
-            <option value="s2hk">简体 → 香港繁体</option>
-            <option value="t2hk">繁体 → 香港繁体</option>
-            <option value="s2tw">简体 → 台湾正体</option>
-            <option value="t2tw">繁体 → 台湾正体</option>
+            <option value="s2t">简体 &#x2192; 繁体</option>
+            <option value="t2s" selected>繁体 &#x2192; 简体</option>
+            <option value="s2hk">简体 &#x2192; 香港繁体</option>
+            <option value="t2hk">繁体 &#x2192; 香港繁体</option>
+            <option value="s2tw">简体 &#x2192; 台湾正体</option>
+            <option value="t2tw">繁体 &#x2192; 台湾正体</option>
           </select>
+        </div>
+        <div class="option-label" style="margin-bottom:0;">
+          <span class="badge">提示</span>
+          <span style="font-size:12px;color:var(--warm-gray);font-weight:400;">由 OpenCC 驱动，支持 6 种转换方向</span>
         </div>
       </div>
     </div>
 
-    <!-- 净化 -->
+    <!-- 文本净化 -->
     <div class="tool-card">
       <div class="tool-card-header" data-toggle="cleanBody">
         <span class="icon">&#x2728;</span>
@@ -753,36 +684,22 @@ body {
         <div class="option-group">
           <div class="option-label">净化选项</div>
           <div class="checkbox-group">
-            <label class="checkbox-item" data-val="removeBlankLines">
-              <input type="checkbox"> 清除空白行
-            </label>
-            <label class="checkbox-item" data-val="removeExtraSpaces">
-              <input type="checkbox"> 合并多余空格
-            </label>
-            <label class="checkbox-item" data-val="removeExtraNewlines">
-              <input type="checkbox"> 合并连续换行
-            </label>
-            <label class="checkbox-item" data-val="normalizePunct">
-              <input type="checkbox"> 统一标点符号
-            </label>
-            <label class="checkbox-item" data-val="removeSpecialChars">
-              <input type="checkbox"> 清除特殊符号
-            </label>
-            <label class="checkbox-item" data-val="trimLines">
-              <input type="checkbox"> 去除行首尾空白
-            </label>
-            <label class="checkbox-item" data-val="removeUrls">
-              <input type="checkbox"> 清除网址链接
-            </label>
-            <label class="checkbox-item" data-val="removeEmails">
-              <input type="checkbox"> 清除邮箱地址
-            </label>
+            <label class="checkbox-item" data-val="removeBlankLines"><input type="checkbox"> 清除空白行</label>
+            <label class="checkbox-item" data-val="removeExtraSpaces"><input type="checkbox"> 合并多余空格</label>
+            <label class="checkbox-item" data-val="removeExtraNewlines"><input type="checkbox"> 合并连续换行</label>
+            <label class="checkbox-item" data-val="normalizePunct"><input type="checkbox"> 统一标点符号</label>
+            <label class="checkbox-item" data-val="removeSpecialChars"><input type="checkbox"> 清除特殊符号</label>
+            <label class="checkbox-item" data-val="trimLines"><input type="checkbox"> 去除行首尾空白</label>
+            <label class="checkbox-item" data-val="removeUrls"><input type="checkbox"> 清除网址链接</label>
+            <label class="checkbox-item" data-val="removeEmails"><input type="checkbox"> 清除邮箱地址</label>
+            <label class="checkbox-item" data-val="removeZeroWidth"><input type="checkbox"> 清除零宽字符</label>
+            <label class="checkbox-item" data-val="tabsToSpaces"><input type="checkbox"> Tab 转空格</label>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 去除 -->
+    <!-- 自定义去除 -->
     <div class="tool-card">
       <div class="tool-card-header" data-toggle="removeBody">
         <span class="icon">&#x2702;&#xFE0F;</span>
@@ -793,18 +710,10 @@ body {
         <div class="option-group">
           <div class="option-label">快速去除</div>
           <div class="checkbox-group">
-            <label class="checkbox-item" data-val="removeHtmlTags">
-              <input type="checkbox"> HTML 标签
-            </label>
-            <label class="checkbox-item" data-val="removeNumbers">
-              <input type="checkbox"> 数字
-            </label>
-            <label class="checkbox-item" data-val="removeEnglish">
-              <input type="checkbox"> 英文字母
-            </label>
-            <label class="checkbox-item" data-val="removePunctuation">
-              <input type="checkbox"> 所有标点符号
-            </label>
+            <label class="checkbox-item" data-val="removeHtmlTags"><input type="checkbox"> HTML 标签</label>
+            <label class="checkbox-item" data-val="removeNumbers"><input type="checkbox"> 数字</label>
+            <label class="checkbox-item" data-val="removeEnglish"><input type="checkbox"> 英文字母</label>
+            <label class="checkbox-item" data-val="removePunctuation"><input type="checkbox"> 所有标点符号</label>
           </div>
         </div>
         <div class="option-group" style="margin-top:12px;">
@@ -823,23 +732,90 @@ body {
       </div>
     </div>
 
-    <!-- 全部处理 -->
-    <div class="tool-card" style="grid-column: span 1;">
+    <!-- 查找替换 -->
+    <div class="tool-card">
+      <div class="tool-card-header" data-toggle="findBody">
+        <span class="icon">&#x1F50D;</span>
+        <h3>查找替换</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="findBody">
+        <div class="option-group">
+          <div class="option-label">查找内容</div>
+          <input type="text" class="text-input" id="findInput" placeholder="输入要查找的文本或正则">
+        </div>
+        <div class="option-group">
+          <div class="option-label">替换为</div>
+          <input type="text" class="text-input" id="replaceInput" placeholder="留空表示删除">
+        </div>
+        <div class="option-group">
+          <div class="toggle-wrap">
+            <span class="toggle-label">使用正则表达式</span>
+            <label class="toggle">
+              <input type="checkbox" id="findRegex">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-wrap" style="margin-bottom:0;">
+            <span class="toggle-label">区分大小写</span>
+            <label class="toggle">
+              <input type="checkbox" id="findCaseSensitive">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold btn-sm" id="btnFindCount">&#x1F4CA; 统计匹配数</button>
+          <button class="btn btn-primary btn-sm" id="btnReplaceAll">&#x21BA;&#xFE0F; 全部替换</button>
+        </div>
+        <div class="option-label" style="margin-top:8px;"><span id="findResult" style="font-size:12px;color:var(--warm-gray);font-weight:400;">替换会作用于「处理后文本」，可撤销</span></div>
+      </div>
+    </div>
+
+    <!-- 一键处理 -->
+    <div class="tool-card span-2">
       <div class="tool-card-header" data-toggle="batchBody">
         <span class="icon">&#x26A1;</span>
         <h3>一键处理</h3>
         <span class="toggle-indicator">&#x25BC;</span>
       </div>
       <div class="tool-card-body" id="batchBody">
-        <div class="option-group">
-          <div class="option-label">顺序执行：简繁转换 → 净化 → 去除</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-            <button class="btn btn-primary" id="btnProcessAll" disabled>&#x26A1; 执行全部处理</button>
-            <button class="btn btn-outline btn-sm" id="btnResetPreview" disabled>&#x21BA; 重置预览</button>
-          </div>
+        <div class="option-group" style="margin-bottom:10px;">
+          <div class="option-label">顺序执行：简繁转换 &#x2192; 净化 &#x2192; 去除</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-primary" id="btnProcessAll" disabled>&#x26A1; 执行全部处理</button>
+          <button class="btn btn-outline" id="btnUndo" disabled title="Ctrl+Z">&#x21A9;&#xFE0F; 撤销</button>
+          <button class="btn btn-outline" id="btnRedo" disabled title="Ctrl+Shift+Z">&#x21AA;&#xFE0F; 重做</button>
+          <button class="btn btn-outline" id="btnResetPreview" disabled>&#x21BA; 重置预览</button>
+          <span style="font-size:12px;color:var(--warm-gray);">快捷键 Ctrl+Enter 处理 &middot; Ctrl+Z 撤销</span>
         </div>
       </div>
     </div>
+
+    <!-- 批量处理 -->
+    <div class="tool-card span-2">
+      <div class="tool-card-header" data-toggle="multiBody">
+        <span class="icon">&#x1F4DA;</span>
+        <h3>批量处理</h3>
+        <span class="toggle-indicator">&#x25BC;</span>
+      </div>
+      <div class="tool-card-body" id="multiBody">
+        <div class="option-group">
+          <div class="option-label">按当前设置批量处理多个文件，打包为 ZIP 下载 <span class="badge">需网络加载 JSZip</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-outline" id="btnBatchSelect">&#x1F4C2; 选择多个文件</button>
+            <button class="btn btn-primary" id="btnBatchProcess" disabled>&#x1F4E6; 全部处理并打包下载</button>
+            <button class="btn btn-outline btn-sm" id="btnBatchClear" disabled>&#x2715; 清空列表</button>
+            <input type="file" class="upload-input" id="batchFileInput" multiple accept=".txt,.html,.htm,.md,.csv,.json,.xml">
+          </div>
+        </div>
+        <div class="batch-list" id="batchFileList"></div>
+        <div class="progress" id="batchProgress" style="display:none;"><div class="progress-bar" id="batchProgressBar"></div></div>
+        <div class="progress-text" id="batchProgressText" style="display:none;"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Action Bar -->
@@ -860,16 +836,10 @@ body {
       <button class="preview-tab" data-pane="resultPane">处理后文本 <span class="count" id="resultCount">0 字</span></button>
     </div>
     <div class="preview-pane" id="originalPane">
-      <div class="placeholder">
-        <span class="big-icon">&#x1F4D6;</span>
-        上传文件后，原始内容将在此显示
-      </div>
+      <div class="placeholder"><span class="big-icon">&#x1F4D6;</span>上传文件后，原始内容将在此显示</div>
     </div>
     <div class="preview-pane hidden" id="resultPane">
-      <div class="placeholder">
-        <span class="big-icon">&#x2699;&#xFE0F;</span>
-        执行处理后，结果将在此显示
-      </div>
+      <div class="placeholder"><span class="big-icon">&#x2699;&#xFE0F;</span>执行处理后，结果将在此显示</div>
     </div>
   </div>
 
@@ -884,7 +854,8 @@ body {
 <div class="processing-overlay" id="processingOverlay">
   <div class="processing-card">
     <div class="spinner"></div>
-    <p>正在处理中，请稍候...</p>
+    <p id="processingText">正在处理中，请稍候...</p>
+    <div class="progress overlay-progress" style="display:none;"><div class="progress-bar" id="overlayProgressBar"></div></div>
   </div>
 </div>
 
@@ -895,86 +866,322 @@ body {
 // ========================
 //  STATE
 // ========================
-const state = {
+var state = {
   rawText: '',
   processedText: '',
   fileName: '',
   fileSize: 0,
   isProcessing: false,
+  undoStack: [],
+  redoStack: [],
+  batchFiles: []
 };
 
 // ========================
 //  DOM REFS
 // ========================
-const $ = (id) => document.getElementById(id);
-const uploadZone = $('uploadZone');
-const uploadEmpty = $('uploadEmpty');
-const uploadFileInfo = $('uploadFileInfo');
-const fileInput = $('fileInput');
-const fileName = $('fileName');
-const fileMeta = $('fileMeta');
-const fileRemoveBtn = $('fileRemoveBtn');
-const statsBar = $('statsBar');
-const statTotalChars = $('statTotalChars');
-const statTotalLines = $('statTotalLines');
-const statChineseChars = $('statChineseChars');
-const statTraditionalChars = $('statTraditionalChars');
-const originalPane = $('originalPane');
-const resultPane = $('resultPane');
-const origCount = $('origCount');
-const resultCount = $('resultCount');
-const btnDownload = $('btnDownload');
-const btnCopyResult = $('btnCopyResult');
-const btnProcessAll = $('btnProcessAll');
-const btnResetPreview = $('btnResetPreview');
-const processingOverlay = $('processingOverlay');
-const toastContainer = $('toastContainer');
+function $(id) { return document.getElementById(id); }
+var uploadZone = $('uploadZone');
+var uploadEmpty = $('uploadEmpty');
+var uploadFileInfo = $('uploadFileInfo');
+var fileInput = $('fileInput');
+var fileName = $('fileName');
+var fileMeta = $('fileMeta');
+var fileRemoveBtn = $('fileRemoveBtn');
+var statsBar = $('statsBar');
+var statTotalChars = $('statTotalChars');
+var statTotalLines = $('statTotalLines');
+var statParagraphs = $('statParagraphs');
+var statChineseChars = $('statChineseChars');
+var statTraditionalChars = $('statTraditionalChars');
+var statOtherChars = $('statOtherChars');
+var originalPane = $('originalPane');
+var resultPane = $('resultPane');
+var origCount = $('origCount');
+var resultCount = $('resultCount');
+var btnDownload = $('btnDownload');
+var btnCopyResult = $('btnCopyResult');
+var btnProcessAll = $('btnProcessAll');
+var btnUndo = $('btnUndo');
+var btnRedo = $('btnRedo');
+var btnResetPreview = $('btnResetPreview');
+var btnTogglePreviewMode = $('btnTogglePreviewMode');
+var processingOverlay = $('processingOverlay');
+var processingText = $('processingText');
+var overlayProgressBar = $('overlayProgressBar');
+var toastContainer = $('toastContainer');
+var themeToggle = $('themeToggle');
+
+// ========================
+//  CORE PURE FUNCTIONS (testable)
+// ========================
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isCJKChar(ch) {
+  var code = ch.charCodeAt(0);
+  return (code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3400 && code <= 0x4dbf);
+}
+
+var cachedConverters = {};
+
+function getConverter(direction) {
+  if (!cachedConverters[direction]) {
+    cachedConverters[direction] = OpenCC.Converter({ from: direction.slice(0, 2), to: direction.slice(2) });
+  }
+  return cachedConverters[direction];
+}
+
+function convertText(text, direction) {
+  if (typeof OpenCC === 'undefined') return text;
+  try {
+    return getConverter(direction)(text);
+  } catch (e) {
+    console.warn('OpenCC conversion failed:', e);
+    return text;
+  }
+}
+
+function cleanText(text, activeVals) {
+  activeVals.forEach(function (val) {
+    switch (val) {
+      case 'removeExtraSpaces':
+        text = text.replace(/[ \t]+/g, ' ').replace(/^ +| +$/gm, '');
+        break;
+      case 'normalizePunct':
+        text = normalizePunctuation(text);
+        break;
+      case 'removeSpecialChars':
+        text = text.replace(/[^\u4e00-\u9fff\u3400-\u4dbf\uff00-\uffef\u3000-\u303f\u0020-\u007e\u00a0-\u00ff\n\r\t]/g, '');
+        break;
+      case 'trimLines':
+        text = text.split('\n').map(function (l) { return l.trim(); }).join('\n');
+        break;
+      case 'removeUrls':
+        text = text.replace(/https?:\/\/[^\s\n\r\u3002\uFF0C\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF09\u300D\u300B\uFF3F\u3009\u300D]+/gi, '');
+        break;
+      case 'removeEmails':
+        text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
+        break;
+      case 'removeZeroWidth':
+        text = text.replace(/[\u200b-\u200f\u202a-\u202e\u2060\u2061\u2062\u2063\ufeff]/g, '');
+        break;
+      case 'tabsToSpaces':
+        text = text.replace(/\t/g, '    ');
+        break;
+    }
+  });
+  return text;
+}
+
+function removeText(text, activeVals, customPatterns, useRegex) {
+  activeVals.forEach(function (val) {
+    switch (val) {
+      case 'removeHtmlTags':
+        text = text.replace(/<[^>]*>/g, '');
+        break;
+      case 'removeNumbers':
+        text = text.replace(/[0-9]+/g, '');
+        break;
+      case 'removeEnglish':
+        text = text.replace(/[a-zA-Z]+/g, '');
+        break;
+      case 'removePunctuation':
+        text = text.replace(/[\u3000-\u303f\uff00-\uffef\u0021-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e\u00a1-\u00bf\u2000-\u206f]/g, '');
+        break;
+    }
+  });
+  if (customPatterns && customPatterns.trim()) {
+    customPatterns.split('\n').forEach(function (line) {
+      var pattern = line.trim();
+      if (!pattern) return;
+      try {
+        if (useRegex) {
+          text = text.replace(new RegExp(pattern, 'g'), '');
+        } else {
+          text = text.replace(new RegExp(escapeRegExp(pattern), 'g'), '');
+        }
+      } catch (e) {
+        console.warn('Pattern failed:', pattern, e);
+      }
+    });
+  }
+  return text;
+}
+
+function crossLineClean(text, activeVals) {
+  activeVals.forEach(function (val) {
+    switch (val) {
+      case 'removeBlankLines':
+        text = text.replace(/^\s*[\r\n]/gm, '');
+        break;
+      case 'removeExtraNewlines':
+        text = text.replace(/\n{3,}/g, '\n\n');
+        break;
+    }
+  });
+  return text;
+}
+
+function normalizePunctuation(text) {
+  var map = {
+    '\uFF0C': ',', '\u3002': '.', '\uFF1B': ';', '\uFF1A': ':',
+    '\uFF01': '!', '\uFF1F': '?',
+    '\uFF08': '(', '\uFF09': ')', '\u3010': '[', '\u3011': ']',
+    '\u300C': '"', '\u300D': '"', '\u300E': "'", '\u300F': "'",
+    '\u300A': '<', '\u300B': '>',
+    '\u2018': "'", '\u2019': "'", '\u201C': '"', '\u201D': '"',
+    '\u2014': '-', '\u2013': '-', '\u2026': '...',
+    '\u3000': ' ', '\u00a0': ' '
+  };
+  var result = '';
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    result += map[ch] || ch;
+  }
+  return result;
+}
+
+// 繁体字统计：优先用 OpenCC 反向对比（精确），不可用时回退到内置繁体字符表
+var tradFallbackTable = '[\u3439\u346e\u346f\u3473\u3476\u3493\u34c4\u34e8\u350b\u35ae\u35f2\u35ff\u3609\u3613\u3614\u361a\u36dd\u3704\u370f\u3710\u3717\u3722\u3737\u379e\u37fa\u380f\u3823\u3897\u389d\u396e\u398e\u399b\u399e\u3a3b\u3a4b\u3a5c\u3a73\u3a75\u3a8e\u3be4\u3c19\u3d57\u3d7e\u3d86\u3dcd\u3dff\u3e07\u3e7d\u3e8f\u3e9c\u3ef6\u3fd6\u3fd7\u3fe7\u4009\u4039\u406a\u407b\u408e\u40ee\u4150\u4173\u4189\u4251\u4259\u426c\u4272\u4276\u42ad\u42b7\u42ba\u42c3\u42d4\u42d9\u42da\u42e6\u42f9\u42fb\u42fc\u42ff\u4308\u430b\u4316\u431d\u431f\u4325\u4330\u4364\u4366\u437d\u4399\u43b1\u44e3\u4564\u4573\u4585\u45c5\u45ff\u4654\u4661\u4671\u46a9\u46c4\u46f3\u4700\u4716\u476d\u477b\u477c\u4788\u478b\u4793\u47c3\u47c6\u47d0\u4806\u4831\u4850\u4869\u4875\u48a8\u4924\u4944\u4947\u4951\u4955\u4957\u4969\u496f\u4971\u4998\u499b\u499f\u49af\u49b3\u49e2\u4a8a\u4a8f\u4a97\u4a98\u4ab4\u4abe\u4ac0\u4ac2\u4adf\u4af4\u4af6\u4afb\u4afe\u4b13\u4b18\u4b1d\u4b1e\u4b27\u4b40\u4b43\u4b51\u4b54\u4b7f\u4b84\u4b9d\u4b9e\u4ba0\u4bab\u4bb0\u4bb3\u4bbe\u4bc0\u4be4\u4c3e\u4c40\u4c41\u4c59\u4c67\u4c6c\u4c70\u4c77\u4c78\u4c7d\u4c81\u4c85\u4c96\u4c98\u4cb0\u4cdc\u4ce2\u4ce4\u4ce7\u4ceb\u4d09\u4d0b\u4d2c\u4d31\u4d34\u4d3d\u4d73\u4d74\u4d95\u4db2\u4e07\u4e11\u4e1f\u4e26\u4e30\u4e48\u4e7e\u4e82\u4e86\u4e8e\u4e91\u4e98\u4e99\u4e9e\u4ec6\u4ec7\u4edd\u4ef7\u4eff\u4f15\u4f19\u4f47\u4f48\u4f54\u4f59\u4f5b\u4f63\u4f75\u4f86\u4f96\u4fb6\u4fb7\u4fc1\u4fc2\u4fca\u4fd3\u4fd4\u4fe0\u4fe5\u4fec\u4fee\u4ff1\u5000\u5006\u5008\u5009\u500b\u5011\u5016\u501f\u502b\u5032\u5049\u5051\u5074\u5075\u507d\u508c\u5091\u5096\u5098\u5099\u50a2\u50ad\u50af\u50b3\u50b4\u50b5\u50b7\u50be\u50c2\u50c5\u50c9\u50cf\u50d1\u50d5\u50de\u50e4\u50e5\u50e8\u50f1\u50f5\u50f9\u5100\u5101\u5102\u5104\u5108\u5109\u510e\u5110\u5114\u5115\u5118\u511f\u5123\u512a\u512d\u5132\u5137\u5138\u513a\u513b\u513c\u5147\u514b\u514c\u5152\u5157\u515a\u5167\u5169\u5177\u518a\u5191\u51a2\u51aa\u51ac\u51c6\u51c8\u51cc\u51cd\u51d9\u51dc\u51e0\u51f1\u51f6\u51fa\u5212\u5225\u522a\u522e\u5236\u5244\u5247\u524b\u524e\u5257\u525b\u525d\u526e\u5274\u5275\u5277\u527e\u5283\u5284\u5287\u5289\u528a\u528c\u528d\u528f\u5291\u529a\u52c1\u52d1\u52d5\u52d9\u52db\u52dd\u52de\u52e2\u52e3\u52e9\u52f1\u52f3\u52f5\u52f8\u52fb\u532d\u532f\u5331\u5340\u5343\u5347\u5354\u535c\u5360\u5377\u5379\u537b\u537d\u5382\u5398\u5399\u53a0\u53a4\u53ad\u53b2\u53b4\u53c3\u53c4\u53da\u53e2\u53ea\u53f0\u53f6\u5401\u5403\u5408\u540a\u540c\u540e\u5411\u5412\u5423\u5433\u5436\u5442\u5446\u5468\u54a8\u54b8\u54bc\u54bd\u54c4\u54e1\u54e9\u54ef\u5504\u5507\u5513\u551a\u5538\u554f\u5553\u555e\u555f\u5562\u5582\u5586\u558e\u559a\u55aa\u55ab\u55ac\u55ae\u55b2\u55c6\u55c7\u55ca\u55ce\u55da\u55e9\u55f0\u55f6\u55f9\u5606\u560d\u5613\u5614\u5616\u5617\u561c\u5629\u562a\u562e\u562f\u5630\u5633\u5635\u5638\u563a\u563d\u5641\u5645\u5653\u565a\u565d\u565e\u5660\u5665\u5666\u566a\u566f\u5672\u5674\u5678\u5679\u5680\u5687\u568c\u5690\u5695\u5699\u569b\u56a5\u56a6\u56a7\u56a8\u56ae\u56b2\u56b3\u56b4\u56b6\u56bd\u56c0\u56c1\u56c2\u56c3\u56c5\u56c8\u56c9\u56cc\u56d1\u56d2\u56de\u56ea\u56f0\u5707\u570b\u570d\u5712\u5713\u5716\u5718\u571e\u574f\u5750\u576f\u57bb\u57e1\u57e8\u57ec\u57f0\u57f7\u5803\u5805\u580a\u5816\u581a\u581d\u5824\u582f\u5831\u5834\u584a\u584b\u584f\u5852\u5857\u585a\u5862\u5864\u5875\u5878\u5879\u587f\u588a\u589c\u58a0\u58ae\u58b0\u58b2\u58b3\u58b6\u58bb\u58be\u58c7\u58c8\u58cb\u58ce\u58d3\u58d7\u58d8\u58d9\u58da\u58dc\u58de\u58df\u58e0\u58e2\u58e3\u58e9\u58ea\u58ef\u58fa\u58fc\u58fd\u5920\u5922\u5925\u592b\u5938\u593e\u5950\u5967\u5969\u596a\u596c\u596e\u5978\u597c\u599d\u59cd\u59dc\u59e6\u5a18\u5a19\u5a1b\u5a41\u5a61\u5a66\u5a6d\u5a88\u5aa7\u5aaf\u5ab0\u5abc\u5abd\u5acb\u5ad7\u5af5\u5afa\u5afb\u5aff\u5b00\u5b03\u5b07\u5b08\u5b0b\u5b0c\u5b19\u5b21\u5b23\u5b24\u5b26\u5b2a\u5b30\u5b38\u5b3b\u5b43\u5b44\u5b46\u5b47\u5b4b\u5b4c\u5b4e\u5b6b\u5b78\u5b7b\u5b7e\u5b7f\u5b83\u5bae\u5bb6\u5bc0\u5be0\u5be2\u5be6\u5be7\u5be9\u5beb\u5bec\u5bf5\u5bf6\u5c07\u5c08\u5c0b\u5c0d\u5c0e\u5c37\u5c38\u5c40\u5c46\u5c4d\u5c53\u5c5c\u5c62\u5c64\u5c68\u5c69\u5c6c\u5ca1\u5ca9\u5cb3\u5cef\u5cf4\u5cf6\u5cfd\u5d0d\u5d11\u5d17\u5d19\u5d22\u5d2c\u5d50\u5d57\u5d7c\u5d7d\u5d7e\u5d81\u5d84\u5d87\u5d88\u5d94\u5d97\u5d98\u5da0\u5da2\u5da7\u5da8\u5dae\u5db8\u5db9\u5dba\u5dbc\u5dbd\u5dca\u5dcb\u5dd2\u5dd4\u5dd6\u5dd7\u5dd8\u5de8\u5df0\u5df9\u5e03\u5e18\u5e25\u5e2b\u5e2d\u5e33\u5e36\u5e40\u5e43\u5e53\u5e57\u5e58\u5e5d\u5e5f\u5e63\u5e69\u5e6b\u5e6c\u5e72\u5e77\u5e78\u5e79\u5e7e\u5e7f\u5ea7\u5eab\u5eb5\u5ec1\u5ec2\u5ec4\u5ec8\u5ece\u5ed5\u5eda\u5edd\u5ede\u5edf\u5ee0\u5ee1\u5ee2\u5ee3\u5ee7\u5ee9\u5eec\u5ef3\u5f12\u5f14\u5f26\u5f33\u5f35\u5f37\u5f43\u5f44\u5f46\u5f48\u5f4c\u5f4e\u5f54\u5f59\u5f60\u5f65\u5f69\u5f6b\u5f72\u5f77\u5f7f\u5f81\u5f85\u5f8c\u5f91\u5f9e\u5fa0\u5fa1\u5fa9\u5fb5\u5fb9\u5fbf\u5fd7\u5ff5\u6046\u6064\u6065\u6085\u609e\u60b5\u60b6\u60bd\u60e1\u60f1\u60f2\u60fb\u6108\u611b\u611c\u6128\u6134\u6137\u613b\u613e\u613f\u6144\u614b\u614d\u6158\u615a\u615f\u6163\u6164\u616a\u616b\u616e\u6173\u6176\u617a\u617c\u617e\u6182\u618a\u6190\u6191\u6192\u6196\u619a\u61a2\u61a4\u61ab\u61ae\u61b2\u61b6\u61b8\u61b9\u61c0\u61c7\u61c9\u61cc\u61cd\u61ce\u61de\u61df\u61e3\u61e4\u61e8\u61f2\u61f6\u61f7\u61f8\u61fa\u61fc\u61fe\u6200\u6207\u6214\u621a\u6227\u6229\u6230\u6231\u6232\u6236\u6247\u624d\u624e\u6258\u625e\u6263\u6298\u62b5\u62cb\u62cf\u62d0\u62da\u62ff\u6302\u6328\u6329\u6331\u633d\u633e\u6346\u634d\u6368\u636b\u636e\u6371\u6372\u6383\u6384\u6386\u6397\u6399\u639a\u639b\u63a1\u63c0\u63da\u63db\u63ee\u63ef\u63f9\u640d\u6416\u6417\u641c\u6427\u6435\u6436\u644b\u6450\u6451\u645c\u645f\u646f\u6473\u6476\u647a\u647b\u6488\u648a\u648f\u6490\u6493\u649d\u649f\u64a3\u64a5\u64a7\u64ab\u64b2\u64b3\u64bb\u64be\u64bf\u64c1\u64c4\u64c7\u64ca\u64cb\u64d3\u64d4\u64da\u64df\u64e0\u64e1\u64e3\u64eb\u64ec\u64ef\u64f0\u64f1\u64f2\u64f4\u64f7\u64fa\u64fb\u64fc\u64fd\u64fe\u6504\u6506\u650b\u650f\u6514\u6516\u6519\u651b\u651c\u651d\u6522\u6523\u6524\u652a\u652c\u654e\u6553\u6557\u6558\u6575\u6578\u6582\u6583\u6585\u6586\u6595\u6597\u65a4\u65ab\u65ac\u65b2\u65b7\u65b8\u65bc\u65c2\u65cb\u65e3\u6606\u6607\u6642\u6649\u665b\u665d\u6688\u6689\u6690\u6697\u6698\u66a2\u66ab\u66b1\u66c4\u66c6\u66c7\u66c9\u66ca\u66cf\u66d6\u66e0\u66e5\u66e8\u66ec\u66f2\u66f8\u6703\u6725\u6727\u672d\u672e\u6731\u6734\u6746\u6760\u676f\u6770\u6771\u677e\u677f\u6781\u679c\u67b4\u67dc\u67f5\u67fa\u67fb\u6817\u6838\u6871\u687f\u6881\u6894\u6896\u6898\u689c\u689d\u689f\u68b2\u68c4\u68ca\u68d6\u68d7\u68df\u68e1\u68e7\u68f1\u68f2\u68f6\u6900\u690f\u6932\u6947\u694a\u6953\u6968\u696d\u6975\u6998\u69a6\u69aa\u69ae\u69b2\u69bf\u69cb\u69cd\u69d3\u69e4\u69e7\u69e8\u69eb\u69ee\u69f3\u69f6\u69fc\u6a01\u6a02\u6a05\u6a11\u6a13\u6a19\u6a1e\u6a20\u6a22\u6a23\u6a24\u6a27\u6a2b\u6a33\u6a38\u6a39\u6a3a\u6a3f\u6a48\u6a4b\u6a5f\u6a62\u6a6b\u6a6f\u6a81\u6a89\u6a94\u6a97\u6a9c\u6a9f\u6aa2\u6aa3\u6aad\u6aae\u6aaf\u6ab3\u6ab5\u6ab8\u6abb\u6ac3\u6ac5\u6acd\u6ad3\u6ada\u6adb\u6add\u6ade\u6adf\u6ae0\u6ae5\u6ae7\u6ae8\u6aea\u6aeb\u6aec\u6af1\u6af3\u6af8\u6afb\u6b04\u6b05\u6b07\u6b0a\u6b0d\u6b0f\u6b10\u6b11\u6b12\u6b13\u6b16\u6b18\u6b1e\u6b32\u6b3d\u6b4e\u6b50\u6b5f\u6b61\u6b72\u6b77\u6b78\u6b7f\u6b98\u6b9e\u6ba2\u6ba4\u6ba8\u6bab\u6bad\u6bae\u6baf\u6bb0\u6bb2\u6bba\u6bbb\u6bbc\u6bc0\u6bc6\u6bca\u6bff\u6c02\u6c08\u6c0c\u6c23\u6c2b\u6c2c\u6c2d\u6c33\u6c3e\u6c4e\u6c59\u6c7a\u6c88\u6c92\u6c96\u6cbe\u6cc1\u6cdb\u6cdd\u6ce8\u6d29\u6d36\u6d5a\u6d79\u6d7f\u6d82\u6d87\u6d8c\u6d97\u6dbc\u6dc0\u6dd2\u6dda\u6de5\u6de8\u6de9\u6dea\u6df5\u6df6\u6dfa\u6dfc\u6e19\u6e1b\u6e22\u6e26\u6e2c\u6e38\u6e3e\u6e4a\u6e4b\u6e5e\u6e67\u6e6f\u6e88\u6e96\u6e9d\u6ea1\u6eaa\u6eab\u6eae\u6eb3\u6ebc\u6ec4\u6ec5\u6ecc\u6ece\u6ed9\u6eec\u6eef\u6ef2\u6ef7\u6ef8\u6efb\u6efe\u6eff\u6f01\u6f0a\u6f0d\u6f13\u6f1a\u6f22\u6f23\u6f2c\u6f32\u6f35\u6f38\u6f3f\u6f41\u6f51\u6f54\u6f55\u6f59\u6f5a\u6f5b\u6f63\u6f64\u6f6f\u6f70\u6f77\u6f7f\u6f80\u6f82\u6f84\u6f85\u6f86\u6f87\u6f90\u6f97\u6fa0\u6fa4\u6fa6\u6fa9\u6fab\u6fac\u6fae\u6fb1\u6fbe\u6fc1\u6fc3\u6fc4\u6fc6\u6fd5\u6fd8\u6fda\u6fdb\u6fdc\u6fdf\u6fe4\u6fe7\u6feb\u6fec\u6ff0\u6ff1\u6ffa\u6ffc\u6ffe\u6fff\u7002\u7003\u7005\u7006\u7007\u7009\u700b\u700f\u7015\u7018\u701d\u701f\u7020\u7026\u7027\u7028\u7030\u7032\u703e\u7043\u7044\u704d\u7051\u7052\u7055\u7058\u7059\u705d\u7061\u7063\u7064\u7067\u7069\u707d\u70ba\u70cf\u70f4\u7121\u7130\u7147\u7149\u7152\u7159\u7162\u7165\u7169\u716c\u7171\u7182\u7185\u7189\u718c\u718f\u7192\u7193\u7197\u719a\u71a1\u71b0\u71b1\u71b2\u71be\u71c0\u71c1\u71c4\u71c8\u71c9\u71d2\u71d6\u71d9\u71dc\u71df\u71e6\u71ec\u71ed\u71f4\u71f6\u71fb\u71fc\u71fe\u7203\u7204\u7207\u720d\u7210\u7216\u721b\u7225\u7227\u722d\u7232\u723a\u723e\u7240\u7246\u7258\u7260\u7274\u727d\u7287\u7296\u729b\u729e\u72a2\u72a7\u72c0\u72f8\u72f9\u72fd\u730c\u7319\u7336\u733b\u7341\u7343\u7344\u7345\u734a\u734e\u7368\u7369\u736a\u736b\u736e\u7370\u7371\u7372\u7375\u7377\u7378\u737a\u737b\u737c\u7380\u7381\u73a9\u73fc\u73fe\u7405\u7431\u743a\u743f\u744b\u7452\u7463\u7464\u7469\u746a\u746f\u7472\u747b\u747d\u7487\u7489\u748a\u7495\u7497\u749d\u74a1\u74a3\u74a6\u74ab\u74af\u74b0\u74b5\u74b8\u74bc\u74bd\u74be\u74bf\u74c4\u74c5\u74ca\u74cf\u74d4\u74d5\u74da\u74db\u750c\u7515\u7522\u7523\u7526\u752f\u755d\u7562\u756b\u7570\u7575\u7576\u757c\u7587\u758a\u75c7\u75d9\u75e0\u75ee\u75fe\u7602\u760b\u760d\u7613\u761e\u7621\u7627\u762e\u7631\u7632\u763a\u763b\u7642\u7646\u7647\u7649\u7650\u7652\u7658\u765f\u7661\u7662\u7664\u7665\u7667\u7669\u766c\u766d\u766e\u7670\u7671\u7672\u767c\u7681\u7682\u769a\u769f\u76b0\u76b8\u76ba\u76c3\u76dc\u76de\u76e1\u76e3\u76e4\u76e7\u76e8\u76ea\u771d\u771e\u7725\u773e\u774d\u774f\u775c\u775e\u7798\u779c\u779e\u77a4\u77ad\u77b6\u77bc\u77c7\u77c9\u77d1\u77d3\u77da\u77e9\u77ef\u7843\u785c\u7864\u7868\u786e\u786f\u7877\u7895\u7899\u78a9\u78ad\u78b8\u78ba\u78bc\u78bd\u78d1\u78da\u78e0\u78e3\u78e7\u78ef\u78fd\u78fe\u7904\u7906\u790e\u7910\u7912\u7919\u7926\u792a\u792b\u792c\u792e\u7931\u7947\u7955\u797f\u798d\u798e\u7995\u79a1\u79a6\u79aa\u79ae\u79b0\u79b1\u79bf\u79c1\u79c8\u79cb\u79cd\u7a05\u7a08\u7a0f\u7a1c\u7a1f\u7a2e\u7a31\u7a40\u7a47\u7a4c\u7a4d\u7a4e\u7a57\u7a60\u7a61\u7a62\u7a69\u7a6b\u7a6d\u7aa9\u7aaa\u7aae\u7aaf\u7ab5\u7ab6\u7aba\u7ac4\u7ac5\u7ac7\u7ac8\u7aca\u7ada\u7aea\u7af1\u7af6\u7b46\u7b4d\u7b51\u7b66\u7b67\u7b71\u7b74\u7b87\u7b8b\u7b8f\u7b9a\u7bc0\u7bc4\u7bc9\u7bcb\u7bd4\u7bd8\u7be0\u7be2\u7be4\u7be9\u7bf3\u7bf8\u7c00\u7c02\u7c0d\u7c11\u7c1e\u7c21\u7c22\u7c23\u7c2b\u7c39\u7c3d\u7c3e\u7c43\u7c45\u7c4b\u7c4c\u7c50\u7c54\u7c59\u7c5b\u7c5c\u7c5f\u7c60\u7c64\u7c69\u7c6a\u7c6c\u7c6e\u7c72\u7cb5\u7cc9\u7cca\u7cdd\u7cde\u7ce7\u7cf0\u7cf2\u7cf4\u7cf6\u7cf9\u7cfa\u7cfb\u7cfe\u7d00\u7d02\u7d03\u7d04\u7d05\u7d06\u7d07\u7d08\u7d09\u7d0b\u7d0d\u7d10\u7d13\u7d14\u7d15\u7d16\u7d17\u7d18\u7d19\u7d1a\u7d1b\u7d1c\u7d1d\u7d1e\u7d1f\u7d21\u7d2c\u7d2e\u7d2f\u7d30\u7d31\u7d32\u7d33\u7d35\u7d39\u7d3a\u7d3c\u7d3f\u7d40\u7d41\u7d42\u7d43\u7d44\u7d45\u7d46\u7d4d\u7d4e\u7d50\u7d55\u7d59\u7d5b\u7d5c\u7d5d\u7d5e\u7d61\u7d62\u7d65\u7d66\u7d67\u7d68\u7d6a\u7d70\u7d71\u7d72\u7d73\u7d76\u7d79\u7d7a\u7d80\u7d81\u7d83\u7d84\u7d86\u7d87\u7d88\u7d89\u7d8b\u7d8c\u7d8e\u7d8f\u7d90\u7d91\u7d93\u7d96\u7d9c\u7d9d\u7d9e\u7d9f\u7da0\u7da1\u7da2\u7da3\u7da7\u7daa\u7dab\u7dac\u7dad\u7daf\u7db0\u7db1\u7db2\u7db3\u7db4\u7db5\u7db8\u7db9\u7dba\u7dbb\u7dbd\u7dbe\u7dbf\u7dc4\u7dc7\u7dca\u7dcb\u7dcd\u7dd1\u7dd2\u7dd3\u7dd4\u7dd7\u7dd8\u7dd9\u7dda\u7ddd\u7dde\u7ddf\u7de0\u7de1\u7de3\u7de4\u7de6\u7de8\u7de9\u7dea\u7dec\u7dee\u7def\u7df0\u7df1\u7df2\u7df4\u7df6\u7df7\u7df8\u7df9\u7dfb\u7dfc\u7e08\u7e09\u7e0a\u7e0b\u7e0d\u7e0e\u7e10\u7e11\u7e15\u7e17\u7e1b\u7e1d\u7e1e\u7e1f\u7e23\u7e27\u7e2b\u7e2c\u7e2d\u7e2e\u7e2f\u7e30\u7e31\u7e32\u7e33\u7e34\u7e35\u7e36\u7e37\u7e38\u7e39\u7e3a\u7e3d\u7e3e\u7e42\u7e43\u7e45\u7e46\u7e48\u7e4f\u7e50\u7e52\u7e53\u7e54\u7e55\u7e5a\u7e5e\u7e5f\u7e61\u7e62\u7e68\u7e69\u7e6a\u7e6b\u7e6c\u7e6d\u7e6e\u7e6f\u7e70\u7e73\u7e76\u7e77\u7e78\u7e79\u7e7b\u7e7c\u7e7d\u7e7e\u7e7f\u7e81\u7e86\u7e87\u7e88\u7e8a\u7e8c\u7e8d\u7e8f\u7e93\u7e94\u7e95\u7e96\u7e97\u7e98\u7e9a\u7e9c\u7f3d\u7f43\u7f48\u7f4c\u7f4e\u7f70\u7f75\u7f77\u7f85\u7f86\u7f88\u7f8b\u7fa3\u7fa5\u7fa8\u7fa9\u7fb5\u7fb6\u7fd2\u7feb\u7fec\u7ff9\u7ffd\u8007\u8008\u8011\u8021\u802c\u802e\u8056\u805e\u806f\u8070\u8072\u8073\u8075\u8076\u8077\u8079\u807b\u807d\u807e\u8085\u80c4\u80cc\u80dc\u80e1\u8105\u8108\u811b\u8123\u8125\u8129\u812b\u8139\u814a\u814c\u814e\u8156\u8161\u8166\u816a\u816b\u8173\u8178\u8183\u8195\u819a\u819e\u81a0\u81a2\u81a9\u81b9\u81bb\u81bd\u81be\u81bf\u81c9\u81cd\u81cf\u81d7\u81d8\u81da\u81df\u81e0\u81e2\u81e5\u81e8\u81f4\u81fa\u8207\u8208\u8209\u820a\u820d\u8216\u8218\u8259\u8263\u8264\u8266\u826b\u8271\u8277\u82b8\u82bb\u82d4\u82e7\u82f9\u8303\u8332\u834a\u8350\u8373\u838a\u8396\u83a2\u83a7\u83c9\u83d3\u83d5\u83ef\u83f4\u83f8\u8407\u840a\u842c\u8434\u8435\u8449\u8452\u845d\u8464\u8466\u846f\u8477\u848d\u8490\u8493\u8494\u8495\u8499\u849e\u84ad\u84bc\u84c0\u84c6\u84cb\u84e7\u84ee\u84ef\u84f4\u84fd\u8504\u8511\u8514\u8518\u851e\u8523\u8525\u8526\u852d\u852f\u853f\u8541\u8546\u854e\u8552\u8553\u8555\u8558\u855d\u8562\u8569\u856a\u856d\u8573\u8577\u857d\u8580\u8586\u8588\u858a\u858c\u8591\u8594\u8598\u859f\u85a6\u85a9\u85b0\u85b3\u85b4\u85b5\u85b9\u85ba\u85c9\u85cd\u85ce\u85dd\u85e4\u85e5\u85ea\u85ed\u85f4\u85f6\u85f7\u85f9\u85fa\u8600\u8604\u8606\u8607\u860a\u860b\u8617\u861a\u861e\u861f\u8622\u862d\u863a\u863f\u8646\u8649\u8655\u865b\u865c\u865f\u8667\u866b\u866f\u869d\u86fa\u86fb\u8706\u8721\u8740\u874e\u8755\u875f\u8766\u8768\u8778\u8784\u879e\u87a2\u87ae\u87bb\u87bf\u87c2\u87c4\u87c8\u87ce\u87d8\u87dc\u87e3\u87ec\u87ef\u87f2\u87f3\u87f6\u87fb\u8800\u8801\u8805\u8806\u880d\u8810\u8811\u8814\u8819\u881f\u8823\u8826\u8828\u8831\u8836\u883b\u883e\u8846\u884a\u8853\u8855\u885a\u885b\u885d\u8868\u8879\u889e\u88b7\u88ca\u88cf\u88dc\u88dd\u88e1\u88fd\u8907\u890c\u8918\u8932\u8933\u8938\u893b\u8940\u8947\u8949\u894f\u8953\u8956\u8957\u8958\u895d\u8960\u8964\u896a\u896c\u896f\u8970\u8972\u8974\u8975\u8986\u8988\u898b\u898e\u898f\u8993\u8996\u8998\u899b\u89a1\u89a5\u89a6\u89aa\u89ac\u89af\u89b2\u89b7\u89b9\u89ba\u89bc\u89bd\u89bf\u89c0\u89d4\u89f4\u89f6\u89f8\u8a01\u8a02\u8a03\u8a08\u8a0a\u8a0c\u8a0e\u8a0f\u8a10\u8a11\u8a12\u8a13\u8a15\u8a16\u8a17\u8a18\u8a1b\u8a1c\u8a1d\u8a1e\u8a1f\u8a22\u8a23\u8a25\u8a28\u8a29\u8a2a\u8a2d\u8a31\u8a34\u8a36\u8a3a\u8a3b\u8a3c\u8a40\u8a41\u8a46\u8a4a\u8a4e\u8a50\u8a51\u8a52\u8a53\u8a54\u8a55\u8a56\u8a57\u8a58\u8a5b\u8a5d\u8a5e\u8a60\u8a61\u8a62\u8a63\u8a66\u8a69\u8a6a\u8a6b\u8a6c\u8a6d\u8a6e\u8a70\u8a71\u8a72\u8a73\u8a75\u8a77\u8a7c\u8a7f\u8a82\u8a84\u8a85\u8a86\u8a87\u8a8b\u8a8c\u8a8d\u8a91\u8a92\u8a95\u8a98\u8a9a\u8a9e\u8aa0\u8aa1\u8aa3\u8aa4\u8aa5\u8aa6\u8aa8\u8aaa\u8aab\u8aac\u8ab0\u8ab2\u8ab3\u8ab4\u8ab6\u8ab7\u8ab9\u8aba\u8abc\u8abe\u8abf\u8ac2\u8ac4\u8ac7\u8ac9\u8acb\u8acd\u8acf\u8ad1\u8ad2\u8ad3\u8ad6\u8ad7\u8adb\u8adc\u8add\u8ade\u8adf\u8ae1\u8ae2\u8ae3\u8ae4\u8ae5\u8ae6\u8ae7\u8aeb\u8aed\u8aee\u8aef\u8af0\u8af1\u8af2\u8af3\u8af4\u8af6\u8af7\u8af8\u8afa\u8afc\u8afe\u8b00\u8b01\u8b02\u8b04\u8b05\u8b06\u8b09\u8b0a\u8b0e\u8b0f\u8b10\u8b14\u8b16\u8b17\u8b19\u8b1a\u8b1b\u8b1d\u8b20\u8b21\u8b28\u8b2b\u8b2c\u8b2d\u8b2f\u8b31\u8b33\u8b38\u8b39\u8b3e\u8b41\u8b42\u8b45\u8b46\u8b49\u8b4a\u8b4e\u8b4f\u8b51\u8b53\u8b56\u8b58\u8b59\u8b5a\u8b5c\u8b5e\u8b5f\u8b68\u8b6b\u8b6d\u8b6f\u8b70\u8b74\u8b77\u8b78\u8b7d\u8b7e\u8b80\u8b85\u8b8a\u8b8b\u8b8c\u8b8e\u8b92\u8b93\u8b95\u8b96\u8b9a\u8b9c\u8b9e\u8c37\u8c3f\u8c46\u8c48\u8c4e\u8c50\u8c54\u8c61\u8c6c\u8c75\u8c76\u8c8d\u8c93\u8c97\u8c99\u8c9d\u8c9e\u8c9f\u8ca0\u8ca1\u8ca2\u8ca7\u8ca8\u8ca9\u8caa\u8cab\u8cac\u8caf\u8cb0\u8cb2\u8cb3\u8cb4\u8cb6\u8cb7\u8cb8\u8cba\u8cbb\u8cbc\u8cbd\u8cbf\u8cc0\u8cc1\u8cc2\u8cc3\u8cc4\u8cc5\u8cc7\u8cc8\u8cca\u8cd1\u8cd2\u8cd3\u8cd5\u8cd9\u8cda\u8cdc\u8cdd\u8cde\u8cdf\u8ce0\u8ce1\u8ce2\u8ce3\u8ce4\u8ce6\u8ce7\u8cea\u8ceb\u8cec\u8ced\u8cf0\u8cf4\u8cf5\u8cfa\u8cfb\u8cfc\u8cfd\u8cfe\u8d03\u8d04\u8d05\u8d07\u8d08\u8d09\u8d0a\u8d0b\u8d0d\u8d0f\u8d10\u8d11\u8d13\u8d14\u8d16\u8d17\u8d1a\u8d1b\u8d1c\u8d6c\u8d95\u8d99\u8da8\u8db2\u8dd6\u8de1\u8e10\u8e30\u8e34\u8e4c\u8e54\u8e55\u8e5f\u8e60\u8e63\u8e64\u8e73\u8e7a\u8e7b\u8e82\u8e89\u8e8a\u8e8b\u8e8d\u8e8e\u8e91\u8e92\u8e93\u8e95\u8e98\u8e9a\u8e9d\u8ea1\u8ea5\u8ea6\u8eaa\u8ec0\u8ec9\u8eca\u8ecb\u8ecc\u8ecd\u8ecf\u8ed1\u8ed2\u8ed4\u8ed5\u8ed7\u8edb\u8edc\u8edd\u8edf\u8ee4\u8ee8\u8eeb\u8eec\u8ef2\u8ef7\u8ef8\u8ef9\u8efa\u8efb\u8efc\u8efe\u8eff\u8f03\u8f04\u8f05\u8f07\u8f08\u8f09\u8f0a\u8f0b\u8f12\u8f13\u8f14\u8f15\u8f16\u8f17\u8f1b\u8f1c\u8f1d\u8f1e\u8f1f\u8f22\u8f25\u8f26\u8f28\u8f29\u8f2a\u8f2c\u8f2e\u8f2f\u8f33\u8f36\u8f37\u8f38\u8f3b\u8f3c\u8f3e\u8f3f\u8f40\u8f42\u8f44\u8f45\u8f46\u8f47\u8f49\u8f4a\u8f4d\u8f4e\u8f50\u8f54\u8f57\u8f5f\u8f60\u8f61\u8f62\u8f63\u8f64\u8f9f\u8fa6\u8fad\u8fae\u8faf\u8fb2\u8ff4\u8ffa\u9002\u9015\u9019\u9023\u9031\u9032\u904a\u904b\u904e\u9054\u9055\u9059\u905c\u905e\u9060\u9061\u9069\u9071\u9072\u9076\u9077\u9078\u907a\u907c\u9081\u9084\u9087\u908a\u908f\u9090\u90a8\u90c1\u90df\u90f5\u9106\u9109\u9112\u9114\u9116\u911f\u9127\u9129\u912d\u9130\u9132\u9133\u9134\u9136\u913a\u9147\u9148\u9178\u9183\u9196\u919c\u919e\u919f\u91a3\u91ab\u91ac\u91b1\u91b2\u91b6\u91c0\u91c1\u91c3\u91c5\u91c7\u91cb\u91cc\u91d0\u91d2\u91d3\u91d4\u91d5\u91d7\u91d8\u91d9\u91da\u91dd\u91df\u91e3\u91e4\u91e6\u91e7\u91e8\u91e9\u91f2\u91f3\u91f4\u91f5\u91f7\u91f9\u91fa\u91fe\u91ff\u9200\u9201\u9203\u9204\u9205\u9206\u9207\u9208\u9209\u920b\u920d\u920e\u9210\u9211\u9212\u9214\u9215\u9216\u9217\u921b\u921e\u9220\u9221\u9223\u9225\u9226\u9227\u922e\u922f\u9230\u9232\u9233\u9234\u9237\u9238\u9239\u923a\u923d\u923e\u923f\u9240\u9241\u9245\u9246\u9248\u9249\u924a\u924b\u924d\u9251\u9254\u9255\u9257\u925a\u925b\u925d\u925e\u9260\u9262\u9264\u9265\u9266\u9267\u926c\u926d\u926e\u9273\u9276\u9277\u9278\u927a\u927b\u927d\u927e\u927f\u9280\u9281\u9282\u9283\u9285\u9288\u928a\u928d\u928f\u9291\u9293\u9296\u9298\u929a\u929b\u929c\u92a0\u92a3\u92a5\u92a6\u92a8\u92a9\u92aa\u92ab\u92ac\u92b1\u92b3\u92b6\u92b7\u92b9\u92bb\u92bc\u92c1\u92c2\u92c3\u92c5\u92c7\u92c9\u92cc\u92cf\u92d0\u92d2\u92d7\u92d9\u92dd\u92df\u92e0\u92e3\u92e4\u92e5\u92e6\u92e8\u92e9\u92ea\u92ed\u92ee\u92ef\u92f0\u92f1\u92f6\u92f8\u92f9\u92fc\u9300\u9301\u9302\u9304\u9306\u9307\u9308\u930f\u9310\u9312\u9315\u9318\u9319\u931a\u931b\u931c\u931d\u931e\u931f\u9320\u9321\u9322\u9324\u9325\u9326\u9328\u9329\u932b\u932e\u932f\u9332\u9333\u9336\u9338\u933c\u933d\u9340\u9341\u9343\u9344\u9345\u9346\u9347\u9348\u9349\u934a\u934b\u934d\u9352\u9354\u9358\u935a\u935b\u9360\u9364\u9365\u9369\u936c\u936d\u936e\u9370\u9375\u9376\u937a\u937c\u937e\u9382\u9384\u9387\u9388\u938a\u938c\u938d\u9393\u9394\u9396\u9397\u9398\u9399\u939a\u939b\u939d\u939e\u93a1\u93a2\u93a3\u93a6\u93a7\u93a9\u93aa\u93ac\u93ad\u93ae\u93af\u93b0\u93b2\u93b3\u93b5\u93b6\u93b7\u93b8\u93bf\u93c3\u93c6\u93c7\u93c8\u93c9\u93cc\u93cd\u93cf\u93d0\u93d1\u93d7\u93d8\u93da\u93dc\u93dd\u93de\u93df\u93e1\u93e2\u93e4\u93e5\u93e6\u93e8\u93f0\u93f5\u93f7\u93f9\u93fa\u93fb\u93fd\u93fe\u9403\u9404\u9407\u9408\u940b\u940d\u940e\u940f\u9410\u9412\u9413\u9414\u9418\u9419\u941d\u9420\u9425\u9426\u9427\u9428\u9429\u942a\u942b\u942e\u942f\u9432\u9433\u9435\u9436\u9438\u943a\u943c\u943d\u943f\u9440\u9444\u9449\u944a\u944c\u9451\u9452\u9454\u9455\u945e\u9460\u9463\u9465\u946a\u946d\u9470\u9471\u9472\u9474\u9477\u9479\u947c\u947d\u947e\u947f\u9481\u9482\u9577\u9580\u9582\u9583\u9586\u9588\u9589\u958b\u958c\u958d\u958e\u958f\u9590\u9591\u9592\u9593\u9594\u9597\u9598\u959d\u959e\u95a1\u95a3\u95a4\u95a5\u95a8\u95a9\u95ab\u95ac\u95ad\u95b1\u95b2\u95b5\u95b6\u95b9\u95bb\u95bc\u95bd\u95be\u95bf\u95c3\u95c6\u95c7\u95c8\u95c9\u95ca\u95cb\u95cc\u95cd\u95d0\u95d1\u95d2\u95d3\u95d4\u95d5\u95d6\u95dc\u95de\u95e0\u95e1\u95e2\u95e4\u95e5\u962a\u9658\u965d\u965e\u9663\u9670\u9673\u9678\u967d\u9684\u9689\u968a\u968e\u9691\u9695\u969b\u96a4\u96a8\u96aa\u96ae\u96af\u96b1\u96b4\u96b8\u96bb\u96c7\u96cb\u96d5\u96d6\u96d9\u96db\u96dc\u96de\u96e2\u96e3\u96f2\u96fb\u9711\u9722\u9723\u9727\u973c\u973d\u9742\u9744\u9746\u9748\u9749\u975a\u975c\u975d\u9762\u9766\u9767\u9768\u978f\u979d\u97a6\u97bd\u97be\u97c1\u97c3\u97c6\u97c9\u97cb\u97cc\u97cd\u97d3\u97d9\u97da\u97db\u97dc\u97dd\u97de\u97e0\u97fb\u97ff\u9801\u9802\u9803\u9805\u9806\u9807\u9808\u980a\u980c\u980d\u980e\u980f\u9810\u9811\u9812\u9813\u9814\u9817\u9818\u981c\u9820\u9821\u9824\u9826\u982b\u982d\u982e\u9830\u9832\u9834\u9835\u9837\u9838\u9839\u983b\u983d\u9842\u9843\u9845\u9846\u984c\u984d\u984e\u984f\u9852\u9853\u9854\u9857\u9858\u9859\u985b\u985e\u9862\u9863\u9865\u9867\u986b\u986c\u986f\u9870\u9871\u9873\u9874\u98a8\u98ad\u98ae\u98af\u98b0\u98b1\u98b3\u98b6\u98b7\u98b8\u98ba\u98bb\u98bc\u98be\u98c0\u98c4\u98c6\u98c8\u98cb\u98db\u98e0\u98e2\u98e3\u98e5\u98e6\u98e9\u98ea\u98eb\u98ed\u98ef\u98f1\u98f2\u98f4\u98f5\u98f6\u98fc\u98fd\u98fe\u98ff\u9903\u9904\u9905\u9908\u9909\u990a\u990c\u990e\u990f\u9911\u9912\u9913\u9914\u9915\u9916\u9917\u9918\u991a\u991b\u991c\u991e\u9921\u9926\u9927\u9928\u992a\u992b\u992c\u992d\u9931\u9933\u9935\u9936\u9937\u9938\u993a\u993c\u993e\u993f\u9941\u9943\u9945\u9948\u9949\u994a\u994b\u994c\u9951\u9952\u9957\u9958\u995c\u995e\u995f\u9960\u9962\u99ac\u99ad\u99ae\u99af\u99b1\u99b3\u99b4\u99b9\u99bc\u99c1\u99c3\u99c9\u99ca\u99ce\u99d0\u99d1\u99d2\u99d3\u99d4\u99d5\u99d8\u99d9\u99da\u99db\u99dd\u99de\u99df\u99e1\u99e2\u99e4\u99e7\u99e9\u99ea\u99eb\u99ed\u99f0\u99f1\u99f6\u99f8\u99fb\u99fc\u99ff\u9a01\u9a02\u9a03\u9a04\u9a05\u9a09\u9a0a\u9a0c\u9a0d\u9a0e\u9a0f\u9a11\u9a14\u9a16\u9a19\u9a1a\u9a1c\u9a1d\u9a1e\u9a1f\u9a20\u9a24\u9a27\u9a2a\u9a2b\u9a2d\u9a2e\u9a30\u9a31\u9a34\u9a35\u9a36\u9a37\u9a38\u9a3b\u9a3c\u9a3e\u9a40\u9a41\u9a42\u9a43\u9a44\u9a45\u9a4a\u9a4b\u9a4c\u9a4d\u9a4e\u9a4f\u9a53\u9a55\u9a57\u9a59\u9a5a\u9a5b\u9a5f\u9a62\u9a64\u9a65\u9a66\u9a68\u9a6a\u9a6b\u9aaf\u9acf\u9ad2\u9ad4\u9ad5\u9ad6\u9aee\u9b06\u9b0d\u9b16\u9b1a\u9b20\u9b22\u9b25\u9b27\u9b28\u9b29\u9b2e\u9b31\u9b39\u9b4e\u9b58\u9b5a\u9b5b\u9b5f\u9b62\u9b65\u9b66\u9b68\u9b6f\u9b74\u9b75\u9b77\u9b7a\u9b7d\u9b80\u9b81\u9b83\u9b84\u9b85\u9b86\u9b88\u9b8a\u9b8b\u9b8d\u9b8e\u9b90\u9b91\u9b92\u9b93\u9b9a\u9b9c\u9b9d\u9b9e\u9b9f\u9ba0\u9ba1\u9ba3\u9ba4\u9ba6\u9baa\u9bab\u9bad\u9bae\u9baf\u9bb0\u9bb3\u9bb5\u9bb6\u9bb8\u9bba\u9bbf\u9bc0\u9bc1\u9bc4\u9bc6\u9bc7\u9bc9\u9bca\u9bd2\u9bd4\u9bd5\u9bd6\u9bd7\u9bdb\u9bdd\u9bde\u9be1\u9be2\u9be4\u9be7\u9be8\u9bea\u9beb\u9bec\u9bf0\u9bf1\u9bf4\u9bf6\u9bf7\u9bfb\u9bfd\u9bfe\u9bff\u9c01\u9c02\u9c03\u9c06\u9c08\u9c09\u9c0a\u9c0b\u9c0c\u9c0d\u9c0f\u9c10\u9c11\u9c12\u9c13\u9c15\u9c1b\u9c1c\u9c1f\u9c20\u9c23\u9c24\u9c25\u9c26\u9c27\u9c28\u9c29\u9c2b\u9c2d\u9c2e\u9c31\u9c32\u9c33\u9c35\u9c36\u9c37\u9c39\u9c3a\u9c3b\u9c3c\u9c3d\u9c3e\u9c40\u9c42\u9c44\u9c45\u9c46\u9c47\u9c48\u9c49\u9c4a\u9c52\u9c54\u9c56\u9c57\u9c58\u9c5a\u9c5d\u9c5f\u9c60\u9c62\u9c63\u9c64\u9c67\u9c68\u9c6d\u9c6e\u9c6f\u9c72\u9c77\u9c78\u9c7a\u9ce5\u9ce7\u9ce9\u9cec\u9cf2\u9cf3\u9cf4\u9cf6\u9cf7\u9cfc\u9cfd\u9cfe\u9d00\u9d03\u9d05\u9d06\u9d07\u9d09\u9d10\u9d12\u9d14\u9d15\u9d17\u9d1b\u9d1c\u9d1d\u9d1e\u9d1f\u9d23\u9d25\u9d26\u9d28\u9d2e\u9d2f\u9d30\u9d32\u9d33\u9d34\u9d37\u9d3b\u9d3d\u9d3f\u9d41\u9d42\u9d43\u9d4a\u9d4f\u9d50\u9d51\u9d52\u9d53\u9d5a\u9d5c\u9d5d\u9d5f\u9d60\u9d61\u9d67\u9d69\u9d6a\u9d6b\u9d6c\u9d6e\u9d6f\u9d70\u9d72\u9d77\u9d7e\u9d84\u9d87\u9d89\u9d8a\u9d8c\u9d92\u9d93\u9d96\u9d97\u9d98\u9d9a\u9da0\u9da1\u9da5\u9da6\u9da9\u9daa\u9dac\u9dad\u9daf\u9db0\u9db1\u9db2\u9db4\u9db9\u9dba\u9dbb\u9dbc\u9dbf\u9dc0\u9dc1\u9dc2\u9dc4\u9dc5\u9dc9\u9dca\u9dd0\u9dd3\u9dd4\u9dd6\u9dd7\u9dd9\u9dda\u9ddf\u9de3\u9de4\u9de5\u9de6\u9de8\u9de9\u9deb\u9ded\u9def\u9df2\u9df3\u9df4\u9df7\u9df8\u9df9\u9dfa\u9dfd\u9dff\u9e02\u9e07\u9e0a\u9e0b\u9e0c\u9e0f\u9e11\u9e15\u9e17\u9e18\u9e1a\u9e1b\u9e1d\u9e1e\u9e75\u9e79\u9e7a\u9e7c\u9e7d\u9e97\u9ea5\u9ea8\u9ea9\u9eaa\u9eab\u9eac\u9eaf\u9eb2\u9eb3\u9eb4\u9eb5\u9eb7\u9ebc\u9ebd\u9ec3\u9ecc\u9ede\u9ee8\u9ef2\u9ef4\u9ef6\u9ef7\u9efd\u9eff\u9f02\u9f09\u9f15\u9f34\u9f4a\u9f4b\u9f4e\u9f4f\u9f52\u9f54\u9f55\u9f57\u9f58\u9f59\u9f5c\u9f5f\u9f60\u9f61\u9f63\u9f66\u9f67\u9f69\u9f6a\u9f6c\u9f6d\u9f6e\u9f6f\u9f70\u9f72\u9f74\u9f76\u9f77\u9f7c\u9f7e\u9f8d\u9f8e\u9f90\u9f91\u9f93\u9f94\u9f95\u9f9c\u9fa2\u9fad\u9faf\u9fc1\u9fd3]';
+var tradFallbackRe = new RegExp(tradFallbackTable, 'g');
+
+function countTraditional(text) {
+  if (typeof OpenCC !== 'undefined' && text.length < 2000000) {
+    try {
+      var converted = getConverter('t2s')(text);
+      if (converted.length === text.length) {
+        var count = 0;
+        for (var i = 0; i < text.length; i++) {
+          var ch = text[i];
+          if (isCJKChar(ch) && ch !== converted[i]) count++;
+        }
+        return count;
+      }
+    } catch (e) { /* fall through */ }
+  }
+  return (text.match(tradFallbackRe) || []).length;
+}
+
+function countStats(text) {
+  if (!text) return null;
+  var totalChars = text.length;
+  var lines = text.split('\n').length;
+  var paragraphs = text.split(/\n\s*\n/).filter(function (p) { return p.trim().length > 0; }).length;
+  var chineseChars = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+  var tradChars = countTraditional(text);
+  var otherChars = (text.match(/[a-zA-Z0-9]/g) || []).length;
+  return { totalChars: totalChars, lines: lines, paragraphs: paragraphs, chineseChars: chineseChars, tradChars: tradChars, otherChars: otherChars };
+}
+
+// ========================
+//  SETTINGS PERSISTENCE
+// ========================
+var SETTINGS_KEY = 'wjshuzhai.settings.v1';
+
+function loadSettings() {
+  var s = {};
+  try {
+    s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  } catch (e) { s = {}; }
+  if (s.convDirection) $('convDirection').value = s.convDirection;
+  if (s.useRegex !== undefined) $('useRegex').checked = s.useRegex;
+  if (s.customPatterns !== undefined) $('customRemovePatterns').value = s.customPatterns;
+  if (s.theme) applyTheme(s.theme);
+  ['cleanBody', 'removeBody'].forEach(function (scope) {
+    var body = $(scope);
+    if (!body || !s[scope]) return;
+    body.querySelectorAll('.checkbox-item').forEach(function (item) {
+      if (s[scope].indexOf(item.dataset.val) !== -1) {
+        item.classList.add('active');
+        item.querySelector('input').checked = true;
+      }
+    });
+  });
+}
+
+function saveSettings() {
+  try {
+    var s = {
+      convDirection: $('convDirection').value,
+      useRegex: $('useRegex').checked,
+      customPatterns: $('customRemovePatterns').value,
+      theme: document.documentElement.dataset.theme || 'light',
+      cleanBody: [],
+      removeBody: []
+    };
+    ['cleanBody', 'removeBody'].forEach(function (scope) {
+      var body = $(scope);
+      if (!body) return;
+      body.querySelectorAll('.checkbox-item.active').forEach(function (item) {
+        s[scope].push(item.dataset.val);
+      });
+    });
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch (e) { /* localStorage 不可用时静默 */ }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  themeToggle.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\u1F319';
+}
 
 // ========================
 //  FILE UPLOAD
 // ========================
-uploadZone.addEventListener('click', (e) => {
+uploadZone.addEventListener('click', function (e) {
   if (e.target.closest('.file-remove')) return;
   fileInput.click();
 });
 
-fileInput.addEventListener('change', () => {
+fileInput.addEventListener('change', function () {
   if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
 });
 
-uploadZone.addEventListener('dragover', (e) => {
+uploadZone.addEventListener('dragover', function (e) {
   e.preventDefault();
   uploadZone.classList.add('dragover');
 });
-uploadZone.addEventListener('dragleave', () => {
+uploadZone.addEventListener('dragleave', function () {
   uploadZone.classList.remove('dragover');
 });
-uploadZone.addEventListener('drop', (e) => {
+uploadZone.addEventListener('drop', function (e) {
   e.preventDefault();
   uploadZone.classList.remove('dragover');
   if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
 });
 
-fileRemoveBtn.addEventListener('click', (e) => {
+fileRemoveBtn.addEventListener('click', function (e) {
   e.stopPropagation();
   removeFile();
 });
 
 function handleFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
-  const allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
-  if (!allowed.includes(ext)) {
+  var ext = file.name.split('.').pop().toLowerCase();
+  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
+  if (allowed.indexOf(ext) === -1) {
     showToast('不支持的文件格式：.' + ext + '，请上传 TXT、HTML、MD 等文本文件', 'error');
     return;
   }
 
   state.fileName = file.name;
   state.fileSize = file.size;
+  state.undoStack = [];
+  state.redoStack = [];
+  updateUndoRedo();
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
+  if (file.size > 4 * 1024 * 1024) {
+    showToast('文件较大（' + formatSize(file.size) + '），处理可能需要一些时间', 'info');
+  }
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
     state.rawText = e.target.result;
     state.processedText = '';
+    if ((state.rawText.match(/\uFFFD/g) || []).length > Math.max(10, state.rawText.length * 0.001)) {
+      showToast('检测到大量乱码字符，文件可能不是 UTF-8 编码（如 GBK），请先转换编码', 'error');
+    }
     updateFileUI();
     updateStats(state.rawText);
     showPreview('original', state.rawText);
@@ -986,11 +1193,20 @@ function handleFile(file) {
   reader.readAsText(file, 'UTF-8');
 }
 
+function formatSize(size) {
+  if (size < 1024) return size + ' B';
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+  return (size / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
 function removeFile() {
   state.rawText = '';
   state.processedText = '';
   state.fileName = '';
   state.fileSize = 0;
+  state.undoStack = [];
+  state.redoStack = [];
+  updateUndoRedo();
   uploadEmpty.style.display = '';
   uploadFileInfo.style.display = 'none';
   uploadZone.classList.remove('has-file');
@@ -1011,10 +1227,7 @@ function updateFileUI() {
   uploadFileInfo.style.display = '';
   uploadZone.classList.add('has-file');
   fileName.textContent = state.fileName;
-  const size = state.fileSize;
-  if (size < 1024) fileMeta.textContent = size + ' B';
-  else if (size < 1024 * 1024) fileMeta.textContent = (size / 1024).toFixed(1) + ' KB';
-  else fileMeta.textContent = (size / (1024 * 1024)).toFixed(2) + ' MB';
+  fileMeta.textContent = formatSize(state.fileSize);
 }
 
 // ========================
@@ -1022,50 +1235,37 @@ function updateFileUI() {
 // ========================
 function updateStats(text) {
   if (!text) { statsBar.style.display = 'none'; return; }
-  statsBar.style.display = 'flex';
-  const totalChars = text.length;
-  const lines = text.split('\n').length;
-  const chineseChars = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
-  const tradChars = countTraditional(text);
-  statTotalChars.textContent = totalChars.toLocaleString();
-  statTotalLines.textContent = lines.toLocaleString();
-  statChineseChars.textContent = chineseChars.toLocaleString();
-  statTraditionalChars.textContent = tradChars.toLocaleString();
-}
-
-function countTraditional(text) {
-  // Common traditional Chinese characters
-  const tradRanges = [
-    /[\u4e42-\u4e4e\u4e5a\u4e5c\u4e5e\u4e7e\u4e86\u4ee4\u4ef2\u4f1b\u4f50\u4f5f\u4f60\u4f7f\u4f8b\u4f9b\u4fdd\u4fbf\u5006\u5009\u500b\u500e\u5012\u5016\u502b\u5036\u5049\u504f\u5055\u505a\u505c\u5065\u508d\u5091\u5098\u50a7\u50ad\u50b3\u50b7\u50be\u50c5\u50c9\u50d5\u50e3\u50ed\u50f9\u5100\u5104\u5109\u5112\u511f\u512a\u5132\u5137\u513b\u5140\u5141\u5143\u514b\u5154\u5156\u515c\u5167\u5169\u516d\u5171\u5177\u5178\u517c\u5180\u518d\u5192\u5195\u5197\u51a0\u51a2\u51a5\u51ac\u51b0\u51b6\u51b7\u51c4\u51c6\u51c9\u51cb\u51cc\u51cd\u51cf\u51da\u51dc\u51dd\u51e4\u51ed\u51f0\u51f1\u51f6\u51f8\u51f9\u51fa\u51fb\u51fd\u51ff\u5200\u5201\u5202\u5203\u5206\u5207\u5208\u520a\u520e\u5211\u5212\u5217\u521d\u5224\u5225\u5228\u5229\u522a\u522e\u5230\u5231\u5237\u5238\u5239\u523a\u523b\u523d\u523f\u5240\u5241\u5242\u5243\u5244\u5246\u5247\u524a\u524b\u524c\u524d\u524e\u5250\u5251\u5254\u5255\u5256\u5257\u525a\u525b\u525c\u525d\u525e\u525f\u5260\u5261\u5262\u5263\u5264\u5265\u5267\u5269\u526a\u526b\u526c\u526d\u526e\u526f\u5270\u5272\u5274\u5275\u5277\u527f\u5280\u5281\u5282\u5283\u5284\u5287\u5288\u5289\u528a\u528b\u528c\u528d\u5290\u5291\u5293\u5294\u529b\u529f\u52a0\u52a1\u52a3\u52a6\u52a8\u52a9\u52aa\u52ab\u52ac\u52ad\u52b1\u52b2\u52b3\u52bd\u52be\u52c3\u52c7\u52c9\u52cb\u52d0\u52d2\u52d4\u52d6\u52d8\u52d9\u52db\u52dd\u52de\u52df\u52e2\u52e3\u52e4\u52e6\u52e7\u52e9\u52f0\u52f1\u52f3\u52f5\u52f8\u52fa\u52fb\u52fc\u52fe\u52ff\u5300\u5301\u5302\u5305\u5306\u5308\u530a\u530b\u530c\u530d\u530f\u5310\u5311\u5315\u5316\u5317\u5319\u531c\u531d\u5320\u5321\u5323\u5326\u532a\u532d\u5330\u5331\u5339\u533a\u533b\u533c\u533e\u533f\u5340\u5341\u5343\u5344\u5345\u5347\u5348\u5349\u534a\u534c\u534d\u5351\u5352\u5353\u5354\u5355\u5356\u5357\u5358\u535a\u535c\u535e\u5360\u5361\u5362\u5364\u5366\u5367\u5369\u536b\u536c\u536d\u536e\u536f\u5370\u5371\u5372\u5373\u5374\u5375\u5377\u5378\u5379\u537a\u537b\u537c\u537f\u5382\u5384\u5385\u5386\u5389\u538b\u538c\u538d\u538e\u538f\u5390\u5391\u5395\u5398\u539a\u539d\u539f\u53a2\u53a3\u53a5\u53a6\u53a8\u53a9\u53ab\u53ac\u53ad\u53ae\u53b2\u53b4\u53b6\u53b9\u53bb\u53c1\u53c2\u53c3\u53c8\u53c9\u53ca\u53cb\u53cc\u53cd\u53d1\u53d4\u53d6\u53d7\u53d8\u53d9\u53db\u53df\u53e0\u53e1\u53e2\u53e3\u53e4\u53e5\u53e6\u53e8\u53e9\u53ea\u53eb\u53ec\u53ed\u53ee\u53ef\u53f0\u53f1\u53f2\u53f3\u53f5\u53f6\u53f7\u53f8\u53f9\u53fb\u53fc\u53fe\u53ff\u5400\u5401\u5403\u5404\u5406\u5408\u5409\u540a\u540b\u540c\u540d\u540e\u540f\u5410\u5411\u5412\u5413\u5414\u5415\u5416\u5417\u541b\u541c\u541d\u541e\u541f\u5420\u5421\u5422\u5423\u5426\u5427\u5428\u5429\u542b\u542c\u542d\u542e\u542f\u5430\u5431\u5432\u5433\u5434\u5435\u5436\u5438\u5439\u543b\u543c\u543d\u543e\u543f\u5440\u5442\u5443\u5444\u5446\u5447\u5448\u544a\u544b\u544c\u544d\u544e\u544f\u5450\u5451\u5452\u5453\u5454\u5455\u5456\u5457\u5458\u5459\u545b\u545c\u545d\u545e\u545f\u5460\u5461\u5462\u5463\u5464\u5466\u5467\u5468\u546a\u546b\u546c\u546d\u546e\u546f\u5470\u5471\u5472\u5473\u5474\u5475\u5476\u5477\u5478\u547b\u547c\u547d\u547f\u5480\u5481\u5482\u5484\u5486\u5487\u5488\u548b\u548c\u548e\u548f\u5490\u5491\u5492\u5496\u549a\u549b\u549c\u54a4\u54a6\u54a7\u54a8\u54ab\u54ac\u54b1\u54b3\u54b8\u54bd\u54c0\u54c1\u54c4\u54c6\u54c7\u54c8\u54c9\u54cd\u54ce\u54d9\u54dc\u54dd\u54de\u54e0\u54e1\u54e2\u54e5\u54e6\u54e7\u54e8\u54e9\u54ea\u54eb\u54ed\u54ee\u54f1\u54f2\u54f3\u54fa\u54fc\u54fd\u54ff\u5500\u5501\u5502\u5503\u5504\u5505\u5506\u5507\u5508\u5509\u550a\u550e\u550f\u5510\u5511\u5514\u551a\u5520\u5521\u5522\u5523\u5524\u5527\u552a\u552c\u552e\u5530\u5531\u5533\u5535\u5537\u5538\u5539\u553b\u553c\u553e\u553f\u5540\u5541\u5543\u5544\u5545\u5546\u5548\u5549\u554a\u554b\u554c\u554d\u554e\u554f\u5550\u5551\u5553\u5555\u5556\u5557\u555c\u555e\u555f\u5560\u5561\u5562\u5563\u5564\u5565\u5566\u5567\u556a\u556b\u556c\u556d\u556e\u5570\u5571\u5572\u5574\u5575\u5576\u5577\u5578\u557b\u557c\u557e\u557f\u5580\u5581\u5582\u5583\u5584\u5587\u5588\u5589\u558a\u558b\u558e\u558f\u5590\u5591\u5592\u5593\u5594\u5598\u5599\u559a\u559c\u559d\u559e\u559f\u55a3\u55a4\u55a7\u55a8\u55a9\u55aa\u55ab\u55ac\u55ad\u55ae\u55b0\u55b1\u55b2\u55b3\u55b5\u55b7\u55b9\u55bb\u55bd\u55be\u55c4\u55c5\u55c6\u55c9\u55cb\u55cc\u55ce\u55d0\u55d1\u55d2\u55d3\u55d4\u55d6\u55d9\u55da\u55db\u55dc\u55dd\u55df\u55e1\u55e2\u55e3\u55e4\u55e6\u55e8\u55e9\u55ea\u55eb\u55ec\u55ef\u55f2\u55f3\u55f5\u55f6\u55f7\u55f9\u55fa\u55fc\u55fd\u55fe\u5600\u5601\u5602\u5604\u5605\u5606\u5608\u5609\u560c\u560d\u560e\u560f\u5610\u5611\u5612\u5614\u5616\u5617\u5618\u561b\u561c\u561d\u561e\u561f\u5620\u5621\u5622\u5623\u5624\u5625\u5626\u5627\u5628\u5629\u562a\u562b\u562c\u562e\u562f\u5630\u5631\u5632\u5634\u5635\u5636\u5637\u5638\u5639\u563b\u563c\u563d\u563e\u563f\u5640\u5641\u5642\u5643\u5644\u5645\u5646\u5647\u5648\u564c\u564d\u564e\u564f\u5650\u5653\u5654\u5659\u565b\u565c\u565d\u5660\u5662\u5664\u5665\u5666\u5668\u5669\u566a\u566b\u566c\u566d\u566f\u5670\u5671\u5672\u5674\u5676\u5678\u5679\u567a\u567b\u567c\u567e\u567f\u5680\u5682\u5684\u5685\u5686\u5687\u5689\u568a\u568b\u568c\u568e\u568f\u5690\u5692\u5693\u5695\u5697\u5698\u5699\u569a\u569c\u569d\u569e\u569f\u56a1\u56a2\u56a3\u56a4\u56a6\u56a7\u56a8\u56a9\u56ab\u56ac\u56ad\u56ae\u56af\u56b0\u56b1\u56b2\u56b3\u56b4\u56b6\u56b7\u56b9\u56ba\u56bb\u56bc\u56bd\u56be\u56bf\u56c0\u56c1\u56c2\u56c3\u56c5\u56c8\u56c9\u56ca\u56cb\u56cc\u56cd\u56ce\u56cf\u56d0\u56d1\u56d4\u56d7\u56d9\u56da\u56db\u56dd\u56de\u56df\u56e0\u56e1\u56e4\u56e5\u56e8\u56ea\u56eb\u56ed\u56ee\u56ef\u56f0\u56f1\u56f4\u56f5\u56f6\u56f7\u56f9\u56fa\u56fd\u56fe\u56ff\u5700\u5701\u5702\u5703\u5704\u5707\u5708\u5709\u570a\u570b\u570c\u570d\u570e\u570f\u5710\u5711\u5712\u5713\u5714\u5716\u5718\u5719\u571a\u571b\u571c\u571d\u571e\u571f\u5720\u5721\u5722\u5723\u5728\u5729\u572a\u572c\u572d\u572e\u572f\u5730\u5733\u5739\u573b\u573e\u5740\u5742\u5747\u574a\u574e\u574f\u5750\u5751\u5752\u5757\u575a\u575b\u575c\u575d\u575e\u575f\u5760\u5761\u5764\u5766\u5768\u5769\u576a\u576b\u576d\u576f\u5770\u5771\u5773\u5774\u5775\u5776\u5777\u577b\u577c\u577d\u5782\u5783\u5784\u5786\u5788\u578b\u578c\u578f\u5792\u5793\u5794\u579b\u579c\u579f\u57a0\u57a1\u57a2\u57a3\u57a4\u57a6\u57a7\u57a9\u57ab\u57ad\u57ae\u57b0\u57b1\u57b2\u57b4\u57b5\u57b7\u57b8\u57b9\u57ba\u57bb\u57bc\u57bd\u57be\u57bf\u57c1\u57c2\u57c3\u57c6\u57c7\u57cb\u57cc\u57ce\u57cf\u57d0\u57d2\u57d4\u57d5\u57d7\u57d8\u57d9\u57dc\u57df\u57e0\u57e1\u57e3\u57e4\u57e6\u57e7\u57e9\u57ed\u57f0\u57f4\u57f5\u57f6\u57f7\u57f8\u57f9\u57fa\u57fc\u57fd\u57fe\u57ff\u5800\u5802\u5803\u5805\u5806\u5807\u580a\u580b\u580d\u580e\u580f\u5810\u5811\u5815\u5816\u5819\u581b\u581c\u581d\u581e\u581f\u5820\u5821\u5824\u5826\u5827\u5828\u582a\u582d\u582f\u5830\u5831\u5832\u5834\u5835\u583a\u583b\u583d\u5840\u5844\u584a\u584b\u584c\u5851\u5852\u5854\u5857\u5858\u585a\u585e\u5862\u5863\u5865\u586b\u586c\u5870\u5871\u5875\u5879\u587c\u587e\u587f\u5880\u5881\u5883\u5885\u5887\u5889\u588a\u588b\u588d\u588e\u5890\u5893\u5897\u5898\u5899\u589a\u589c\u589e\u589f\u58a0\u58a1\u58a3\u58a5\u58a6\u58a8\u58a9\u58ab\u58ac\u58ae\u58af\u58b0\u58b1\u58b2\u58b3\u58b6\u58b8\u58b9\u58ba\u58bb\u58bc\u58bd\u58be\u58c0\u58c1\u58c2\u58c5\u58c7\u58c8\u58ca\u58cc\u58ce\u58d1\u58d3\u58d5\u58d8\u58d9\u58da\u58dc\u58de\u58df\u58e0\u58e2\u58e4\u58e9\u58eb\u58ec\u58ef\u58f0\u58f1\u58f2\u58f3\u58f6\u58f7\u58f9\u58fc\u58fd\u58fe\u5900\u5902\u5904\u5906\u5907\u590a\u590d\u590f\u5910\u5914\u5915\u5916\u5919\u591a\u591c\u591f\u5920\u5922\u5924\u5925\u5927\u5929\u592a\u592b\u592c\u592d\u592e\u592f\u5931\u5932\u5937\u5938\u5939\u593a\u593c\u593e\u5940\u5942\u5944\u5946\u5947\u5948\u5949\u594b\u594e\u594f\u5950\u5951\u5954\u5955\u5956\u5957\u5958\u595a\u595b\u5960\u5962\u5965\u5967\u5968\u5969\u596a\u596c\u596e\u5970\u5971\u5973\u5974\u5976\u5978\u5979\u597d\u5980\u5981\u5982\u5984\u5986\u5987\u5988\u598a\u598d\u598e\u598f\u5990\u5992\u5993\u5996\u5997\u5998\u5999\u599b\u599d\u599e\u59a0\u59a1\u59a2\u59a3\u59a4\u59a5\u59a6\u59a7\u59a8\u59a9\u59aa\u59ac\u59ae\u59af\u59b2\u59b3\u59b4\u59b9\u59bb\u59be\u59c3\u59c6\u59c7\u59c9\u59ca\u59cb\u59cd\u59d0\u59d1\u59d2\u59d3\u59d4\u59d7\u59d8\u59d9\u59da\u59dc\u59dd\u59de\u59e0\u59e3\u59e4\u59e5\u59e8\u59ea\u59eb\u59ec\u59ee\u59f1\u59f2\u59f3\u59f5\u59f6\u59f7\u59f9\u59fa\u59fb\u59fc\u59fd\u59fe\u59ff\u5a00\u5a01\u5a03\u5a04\u5a05\u5a06\u5a07\u5a08\u5a09\u5a0a\u5a0b\u5a0c\u5a0d\u5a0e\u5a11\u5a13\u5a15\u5a16\u5a18\u5a1a\u5a1b\u5a1c\u5a1d\u5a1e\u5a1f\u5a20\u5a23\u5a25\u5a29\u5a2a\u5a2b\u5a2c\u5a2d\u5a2e\u5a2f\u5a30\u5a31\u5a32\u5a33\u5a34\u5a35\u5a36\u5a37\u5a38\u5a39\u5a3a\u5a3b\u5a3c\u5a3d\u5a3e\u5a40\u5a41\u5a46\u5a47\u5a49\u5a4a\u5a4b\u5a4c\u5a4d\u5a4e\u5a4f\u5a50\u5a51\u5a52\u5a53\u5a54\u5a55\u5a56\u5a57\u5a58\u5a59\u5a5a\u5a5b\u5a5c\u5a5d\u5a5e\u5a5f\u5a60\u5a61\u5a62\u5a63\u5a64\u5a65\u5a66\u5a67\u5a68\u5a69\u5a6a\u5a6b\u5a6c\u5a6d\u5a6e\u5a6f\u5a70\u5a71\u5a72\u5a73\u5a74\u5a75\u5a76\u5a77\u5a78\u5a79\u5a7a\u5a7b\u5a7c\u5a7d\u5a7e\u5a7f\u5a80\u5a81\u5a82\u5a83\u5a84\u5a85\u5a86\u5a87\u5a88\u5a89\u5a8a\u5a8b\u5a8c\u5a8d\u5a8e\u5a8f\u5a90\u5a91\u5a92\u5a93\u5a94\u5a95\u5a96\u5a97\u5a98\u5a99\u5a9a\u5a9b\u5a9c\u5a9d\u5a9e\u5a9f\u5aa0\u5aa1\u5aa2\u5aa3\u5aa4\u5aa5\u5aa6\u5aa7\u5aa8\u5aa9\u5aaa\u5aab\u5aac\u5aad\u5aae\u5aaf\u5ab0\u5ab1\u5ab2\u5ab3\u5ab4\u5ab5\u5ab6\u5ab7\u5ab8\u5ab9\u5aba\u5abb\u5abc\u5abd\u5abe\u5abf\u5ac0\u5ac1\u5ac2\u5ac3\u5ac4\u5ac5\u5ac6\u5ac7\u5ac8\u5ac9\u5aca\u5acb\u5acc\u5acd\u5ace\u5acf\u5ad0\u5ad1\u5ad2\u5ad3\u5ad4\u5ad5\u5ad6\u5ad7\u5ad8\u5ad9\u5ada\u5adb\u5adc\u5add\u5ade\u5adf\u5ae0\u5ae1\u5ae2\u5ae3\u5ae4\u5ae5\u5ae6\u5ae7\u5ae8\u5ae9\u5aea\u5aeb\u5aec\u5aed\u5aee\u5aef\u5af0\u5af1\u5af2\u5af3\u5af4\u5af5\u5af6\u5af7\u5af8\u5af9\u5afa\u5afb\u5afc\u5afd\u5afe\u5aff\u5b00\u5b01\u5b02\u5b03\u5b04\u5b05\u5b06\u5b07\u5b08\u5b09\u5b0a\u5b0b\u5b0c\u5b0d\u5b0e\u5b0f\u5b10\u5b11\u5b12\u5b13\u5b14\u5b15\u5b16\u5b17\u5b18\u5b19\u5b1a\u5b1b\u5b1c\u5b1d\u5b1e\u5b1f\u5b20\u5b21\u5b22\u5b23\u5b24\u5b25\u5b26\u5b27\u5b28\u5b29\u5b2a\u5b2b\u5b2c\u5b2d\u5b2e\u5b2f\u5b30\u5b31\u5b32\u5b33\u5b34\u5b35\u5b36\u5b37\u5b38\u5b39\u5b3a\u5b3b\u5b3c\u5b3d\u5b3e\u5b3f\u5b40\u5b41\u5b42\u5b43\u5b44\u5b45\u5b46\u5b47\u5b48\u5b49\u5b4a\u5b4b\u5b4c\u5b4d\u5b4e\u5b4f\u5b50\u5b51\u5b52\u5b53\u5b54\u5b55\u5b56\u5b57\u5b58\u5b59\u5b5a\u5b5b\u5b5c\u5b5d\u5b5e\u5b5f\u5b60\u5b61\u5b62\u5b63\u5b64\u5b65\u5b66\u5b67\u5b68\u5b69\u5b6a\u5b6b\u5b6c\u5b6d\u5b6e\u5b6f\u5b70\u5b71\u5b72\u5b73\u5b74\u5b75\u5b76\u5b77\u5b78\u5b79\u5b7a\u5b7b\u5b7c\u5b7d\u5b7e\u5b7f\u5b80\u5b81\u5b82\u5b83\u5b84\u5b85\u5b86\u5b87\u5b88\u5b89\u5b8a\u5b8b\u5b8c\u5b8d\u5b8e\u5b8f\u5b90\u5b91\u5b92\u5b93\u5b94\u5b95\u5b96\u5b97\u5b98\u5b99\u5b9a\u5b9b\u5b9c\u5b9d\u5b9e\u5b9f]/
-  ];
-  let count = 0;
-  for (const re of tradRanges) {
-    count += (text.match(re) || []).length;
-  }
-  return count;
+  statsBar.style.display = 'grid';
+  var st = countStats(text);
+  statTotalChars.textContent = st.totalChars.toLocaleString();
+  statTotalLines.textContent = st.lines.toLocaleString();
+  statParagraphs.textContent = st.paragraphs.toLocaleString();
+  statChineseChars.textContent = st.chineseChars.toLocaleString();
+  statTraditionalChars.textContent = st.tradChars.toLocaleString();
+  statOtherChars.textContent = st.otherChars.toLocaleString();
 }
 
 // ========================
 //  PREVIEW
 // ========================
-document.querySelectorAll('.preview-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+document.querySelectorAll('.preview-tab').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.preview-tab').forEach(function (t) { t.classList.remove('active'); });
     tab.classList.add('active');
-    document.querySelectorAll('.preview-pane').forEach(p => p.classList.add('hidden'));
-    document.getElementById(tab.dataset.pane).classList.remove('hidden');
+    document.querySelectorAll('.preview-pane').forEach(function (p) { p.classList.add('hidden'); });
+    $(tab.dataset.pane).classList.remove('hidden');
   });
 });
 
 function showPreview(pane, text) {
-  const el = pane === 'original' ? originalPane : resultPane;
+  var el = pane === 'original' ? originalPane : resultPane;
   el.textContent = text;
   updateCounts();
 }
 
 function updateCounts() {
-  const orig = state.rawText || '';
-  const result = state.processedText || '';
+  var orig = state.rawText || '';
+  var result = state.processedText || '';
   origCount.textContent = orig.length.toLocaleString() + ' 字';
   resultCount.textContent = result.length.toLocaleString() + ' 字';
   updateStats(state.rawText);
@@ -1083,9 +1283,9 @@ function clearResult() {
 // ========================
 //  TOOL CARD COLLAPSE
 // ========================
-document.querySelectorAll('[data-toggle]').forEach(header => {
-  header.addEventListener('click', () => {
-    const body = document.getElementById(header.dataset.toggle);
+document.querySelectorAll('[data-toggle]').forEach(function (header) {
+  header.addEventListener('click', function () {
+    var body = $(header.dataset.toggle);
     body.classList.toggle('hidden');
     header.querySelector('.toggle-indicator').classList.toggle('collapsed');
   });
@@ -1094,228 +1294,491 @@ document.querySelectorAll('[data-toggle]').forEach(header => {
 // ========================
 //  CHECKBOX TOGGLE
 // ========================
-document.querySelectorAll('.checkbox-item').forEach(item => {
-  item.addEventListener('click', () => {
+document.querySelectorAll('.checkbox-item').forEach(function (item) {
+  item.addEventListener('click', function () {
     item.classList.toggle('active');
     item.querySelector('input').checked = item.classList.contains('active');
+    saveSettings();
   });
 });
 
 // ========================
-//  PROCESSING
+//  UNDO / REDO
 // ========================
+function pushUndo() {
+  state.undoStack.push({ raw: state.rawText, processed: state.processedText });
+  if (state.undoStack.length > 50) state.undoStack.shift();
+  state.redoStack = [];
+  updateUndoRedo();
+}
+
+function undo() {
+  if (state.undoStack.length === 0) return;
+  state.redoStack.push({ raw: state.rawText, processed: state.processedText });
+  var snap = state.undoStack.pop();
+  state.rawText = snap.raw;
+  state.processedText = snap.processed;
+  showPreview('original', state.rawText);
+  if (state.processedText) {
+    showPreview('result', state.processedText);
+    btnDownload.disabled = false;
+    btnCopyResult.disabled = false;
+  } else {
+    clearResult();
+  }
+  updateUndoRedo();
+  showToast('已撤销', 'info');
+}
+
+function redo() {
+  if (state.redoStack.length === 0) return;
+  state.undoStack.push({ raw: state.rawText, processed: state.processedText });
+  var snap = state.redoStack.pop();
+  state.rawText = snap.raw;
+  state.processedText = snap.processed;
+  showPreview('original', state.rawText);
+  if (state.processedText) {
+    showPreview('result', state.processedText);
+    btnDownload.disabled = false;
+    btnCopyResult.disabled = false;
+  } else {
+    clearResult();
+  }
+  updateUndoRedo();
+  showToast('已重做', 'info');
+}
+
+function updateUndoRedo() {
+  btnUndo.disabled = state.undoStack.length === 0;
+  btnRedo.disabled = state.redoStack.length === 0;
+}
+
+// ========================
+//  PROCESSING PIPELINE
+// ========================
+var CHUNK_LINES = 4000;
+
+function showOverlay(text, withProgress) {
+  processingText.textContent = text;
+  var prog = overlayProgressBar.parentElement;
+  prog.style.display = withProgress ? '' : 'none';
+  overlayProgressBar.style.width = '0%';
+  processingOverlay.classList.add('active');
+}
+
+function setOverlayProgress(ratio) {
+  overlayProgressBar.style.width = Math.min(100, Math.round(ratio * 100)) + '%';
+}
+
+function hideOverlay() {
+  processingOverlay.classList.remove('active');
+}
+
+// 分块执行行级处理；跨行正则最后统一执行
+async function processChunks(text, chunkFn, onProgress) {
+  var lines = text.split('\n');
+  var total = lines.length;
+  if (total <= CHUNK_LINES) {
+    return chunkFn(text);
+  }
+  var out = [];
+  for (var i = 0; i < total; i += CHUNK_LINES) {
+    var chunk = lines.slice(i, i + CHUNK_LINES).join('\n');
+    out.push(chunkFn(chunk));
+    if (onProgress) onProgress((i + CHUNK_LINES) / total);
+    await new Promise(function (r) { setTimeout(r, 0); });
+  }
+  return out.join('\n');
+}
+
+function getCleanVals() {
+  var vals = [];
+  $('cleanBody').querySelectorAll('.checkbox-item.active').forEach(function (item) {
+    vals.push(item.dataset.val);
+  });
+  return vals;
+}
+
+function getRemoveVals() {
+  var vals = [];
+  $('removeBody').querySelectorAll('.checkbox-item.active').forEach(function (item) {
+    vals.push(item.dataset.val);
+  });
+  return vals;
+}
+
 async function processText() {
   if (!state.rawText || state.isProcessing) return;
   state.isProcessing = true;
-  processingOverlay.classList.add('active');
+  showOverlay('正在处理中，请稍候...', state.rawText.length > 200000);
 
-  // Use setTimeout to allow UI to update
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise(function (r) { setTimeout(r, 50); });
 
   try {
-    let text = state.rawText;
+    pushUndo();
 
-    // Step 1: Simplified-Traditional conversion
-    const convDirection = document.getElementById('convDirection').value;
-    try {
-      if (typeof OpenCC !== 'undefined') {
-        const converter = OpenCC.Converter({ from: convDirection.slice(0, 2), to: convDirection.slice(2) });
-        text = converter(text);
-      }
-    } catch (e) {
-      console.warn('OpenCC conversion failed:', e);
-    }
+    var convDirection = $('convDirection').value;
+    var cleanVals = getCleanVals();
+    var removeVals = getRemoveVals();
+    var customPatterns = $('customRemovePatterns').value;
+    var useRegex = $('useRegex').checked;
 
-    // Step 2: Cleaning
-    const cleanChecks = document.querySelectorAll('#cleanBody .checkbox-item.active');
-    cleanChecks.forEach(item => {
-      const val = item.dataset.val;
-      switch (val) {
-        case 'removeBlankLines':
-          text = text.replace(/^\s*[\r\n]/gm, '');
-          break;
-        case 'removeExtraSpaces':
-          text = text.replace(/[ \t]+/g, ' ').replace(/^ +| +$/gm, '');
-          break;
-        case 'removeExtraNewlines':
-          text = text.replace(/\n{3,}/g, '\n\n');
-          break;
-        case 'normalizePunct':
-          text = normalizePunctuation(text);
-          break;
-        case 'removeSpecialChars':
-          text = text.replace(/[^\u4e00-\u9fff\u3400-\u4dbf\uff00-\uffef\u3000-\u303f\u0020-\u007e\u00a0-\u00ff\n\r\t]/g, '');
-          break;
-        case 'trimLines':
-          text = text.split('\n').map(l => l.trim()).join('\n');
-          break;
-        case 'removeUrls':
-          text = text.replace(/https?:\/\/[^\s\n\r，。、；：！？）》」】』】]+/gi, '');
-          break;
-        case 'removeEmails':
-          text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
-          break;
-      }
-    });
+    var result = state.rawText;
 
-    // Step 3: Removal
-    const removeChecks = document.querySelectorAll('#removeBody .checkbox-item.active');
-    removeChecks.forEach(item => {
-      const val = item.dataset.val;
-      switch (val) {
-        case 'removeHtmlTags':
-          text = text.replace(/<[^>]*>/g, '');
-          break;
-        case 'removeNumbers':
-          text = text.replace(/[0-9]+/g, '');
-          break;
-        case 'removeEnglish':
-          text = text.replace(/[a-zA-Z]+/g, '');
-          break;
-        case 'removePunctuation':
-          text = text.replace(/[\u3000-\u303f\uff00-\uffef\u0021-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e\u00a1-\u00bf\u2000-\u206f]/g, '');
-          break;
-      }
-    });
+    // 阶段 1+2+3：简繁转换 + 行级净化 + 去除（分块执行，避免大文件卡死 UI）
+    result = await processChunks(result, function (chunk) {
+      var t = convertText(chunk, convDirection);
+      t = cleanText(t, cleanVals);
+      t = removeText(t, removeVals, customPatterns, useRegex);
+      return t;
+    }, function (ratio) { setOverlayProgress(ratio); });
 
-    // Custom patterns
-    const customPatterns = document.getElementById('customRemovePatterns').value;
-    const useRegex = document.getElementById('useRegex').checked;
-    if (customPatterns.trim()) {
-      const lines = customPatterns.split('\n').filter(l => l.trim());
-      for (const pattern of lines) {
-        try {
-          if (useRegex) {
-            const re = new RegExp(pattern, 'g');
-            text = text.replace(re, '');
-          } else {
-            // Escape special regex chars
-            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            text = text.replace(new RegExp(escaped, 'g'), '');
-          }
-        } catch (e) {
-          console.warn('Pattern failed:', pattern, e);
-        }
-      }
-    }
+    // 跨行净化：统一在完整文本上执行
+    result = crossLineClean(result, cleanVals);
 
-    state.processedText = text;
-    return text;
+    state.processedText = result;
+    return result;
   } finally {
     state.isProcessing = false;
-    processingOverlay.classList.remove('active');
+    hideOverlay();
   }
 }
 
-function normalizePunctuation(text) {
-  const map = {
-    '，': ',', '。': '.', '；': ';', '：': ':', '！': '!', '？': '?',
-    '（': '(', '）': ')', '【': '[', '】': ']', '「': '"', '」': '"',
-    '『': "'", '』': "'", '《': '<', '》': '>',
-    '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
-    '\u2014': '-', '\u2013': '-', '\u2026': '...',
-    '\u3000': ' ', '\u00a0': ' ',
-  };
-  let result = '';
-  for (const ch of text) {
-    result += map[ch] || ch;
+// ========================
+//  FIND & REPLACE
+// ========================
+function buildFindRegex(find, useRegex, caseSensitive) {
+  if (!find) return null;
+  var flags = 'g' + (caseSensitive ? '' : 'i');
+  if (useRegex) {
+    return new RegExp(find, flags);
   }
-  return result;
+  return new RegExp(escapeRegExp(find), flags);
+}
+
+function findReplaceAll() {
+  var find = $('findInput').value;
+  var replace = $('replaceInput').value;
+  if (!find) { showToast('请输入查找内容', 'error'); return; }
+  if (!state.processedText) { showToast('请先执行处理，再对结果进行查找替换', 'error'); return; }
+
+  var re;
+  try {
+    re = buildFindRegex(find, $('findRegex').checked, $('findCaseSensitive').checked);
+  } catch (e) {
+    showToast('正则表达式无效：' + e.message, 'error');
+    return;
+  }
+  if (!re) return;
+
+  pushUndo();
+  var matches = state.processedText.match(re);
+  var count = matches ? matches.length : 0;
+  state.processedText = state.processedText.replace(re, replace);
+  showPreview('result', state.processedText);
+  btnDownload.disabled = false;
+  btnCopyResult.disabled = false;
+  $('findResult').textContent = '已替换 ' + count + ' 处' + (count ? '（可撤销）' : '');
+  if (count > 0) showToast('已替换 ' + count + ' 处', 'success');
+}
+
+function findCount() {
+  var find = $('findInput').value;
+  if (!find) { showToast('请输入查找内容', 'error'); return; }
+  var target = state.processedText || state.rawText;
+  if (!target) { showToast('请先上传文件', 'error'); return; }
+  try {
+    var re = buildFindRegex(find, $('findRegex').checked, $('findCaseSensitive').checked);
+    var matches = target.match(re);
+    var count = matches ? matches.length : 0;
+    $('findResult').textContent = '匹配 ' + count + ' 处（统计于' + (state.processedText ? '处理后文本' : '原始文本') + '）';
+  } catch (e) {
+    showToast('正则表达式无效：' + e.message, 'error');
+  }
 }
 
 // ========================
 //  BUTTON HANDLERS
 // ========================
-btnProcessAll.addEventListener('click', async () => {
+btnProcessAll.addEventListener('click', async function () {
   if (!state.rawText) return;
-  const result = await processText();
+  var result = await processText();
   if (result !== undefined) {
     showPreview('result', result);
     btnDownload.disabled = false;
     btnCopyResult.disabled = false;
-    // Switch to result tab
     document.querySelectorAll('.preview-tab')[1].click();
+    updateUndoRedo();
     showToast('处理完成！', 'success');
   }
 });
 
-btnResetPreview.addEventListener('click', () => {
+btnUndo.addEventListener('click', undo);
+btnRedo.addEventListener('click', redo);
+
+btnResetPreview.addEventListener('click', function () {
   clearResult();
   document.querySelectorAll('.preview-tab')[0].click();
   showToast('已重置，可重新处理', 'success');
 });
 
-btnDownload.addEventListener('click', () => {
+btnDownload.addEventListener('click', function () {
   if (!state.processedText) return;
-  const text = state.processedText;
-  const ext = state.fileName.split('.').pop() || 'txt';
-  const baseName = state.fileName.replace(/\.[^.]+$/, '');
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var text = state.processedText;
+  var ext = state.fileName.split('.').pop() || 'txt';
+  var baseName = state.fileName.replace(/\.[^.]+$/, '');
+  downloadTextFile(text, baseName + '_processed.' + ext);
+});
+
+function downloadTextFile(text, filename) {
+  var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
-  a.download = baseName + '_processed.' + ext;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('文件已下载：' + a.download, 'success');
-});
+  showToast('文件已下载：' + filename, 'success');
+}
 
-btnCopyResult.addEventListener('click', async () => {
+btnCopyResult.addEventListener('click', async function () {
   if (!state.processedText) return;
   try {
     await navigator.clipboard.writeText(state.processedText);
     showToast('已复制到剪贴板', 'success');
-  } catch {
+  } catch (e) {
     showToast('复制失败，请手动选择文本复制', 'error');
   }
 });
 
-document.getElementById('btnTogglePreviewMode').addEventListener('click', () => {
-  // Simple toggle between split and single view
-  const panes = document.querySelectorAll('.preview-pane');
-  const tabs = document.querySelectorAll('.preview-tab');
-  const isSplit = panes[0].classList.contains('hidden') === false && panes[1].classList.contains('hidden') === false;
+btnTogglePreviewMode.addEventListener('click', function () {
+  var panes = document.querySelectorAll('.preview-pane');
+  var tabs = document.querySelectorAll('.preview-tab');
+  var isSplit = !panes[0].classList.contains('hidden') && !panes[1].classList.contains('hidden');
   if (isSplit) {
-    // Show only active tab
-    tabs.forEach((t, i) => {
+    tabs.forEach(function (t, i) {
       t.style.display = '';
       panes[i].classList.remove('hidden');
     });
-    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.preview-pane').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.preview-tab').forEach(function (t) { t.classList.remove('active'); });
+    document.querySelectorAll('.preview-pane').forEach(function (p) { p.classList.add('hidden'); });
     document.querySelector('.preview-tab').classList.add('active');
-    document.getElementById('originalPane').classList.remove('hidden');
+    $('originalPane').classList.remove('hidden');
   }
-  // If not in split mode, this is a no-op toggle
+});
+
+// ========================
+//  BATCH PROCESSING
+// ========================
+var btnBatchSelect = $('btnBatchSelect');
+var btnBatchProcess = $('btnBatchProcess');
+var btnBatchClear = $('btnBatchClear');
+var batchFileInput = $('batchFileInput');
+var batchFileList = $('batchFileList');
+var batchProgress = $('batchProgress');
+var batchProgressBar = $('batchProgressBar');
+var batchProgressText = $('batchProgressText');
+
+btnBatchSelect.addEventListener('click', function () { batchFileInput.click(); });
+
+batchFileInput.addEventListener('change', function () {
+  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
+  Array.prototype.forEach.call(batchFileInput.files, function (file) {
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (allowed.indexOf(ext) === -1) {
+      showToast('跳过不支持的文件：' + file.name, 'error');
+      return;
+    }
+    if (state.batchFiles.some(function (f) { return f.file.name === file.name && f.file.size === file.size; })) return;
+    state.batchFiles.push({ file: file, status: 'pending' });
+  });
+  batchFileInput.value = '';
+  renderBatchList();
+});
+
+btnBatchClear.addEventListener('click', function () {
+  state.batchFiles = [];
+  renderBatchList();
+});
+
+function renderBatchList() {
+  batchFileList.innerHTML = '';
+  state.batchFiles.forEach(function (entry, idx) {
+    var div = document.createElement('div');
+    div.className = 'batch-item';
+    var statusText = { pending: '待处理', ok: '已完成', err: '失败', run: '处理中...' }[entry.status] || '';
+    var statusClass = { pending: '', ok: 'ok', err: 'err', run: 'run' }[entry.status] || '';
+    div.innerHTML = '<span class="b-name">' + escapeHtml(entry.file.name) + '</span>' +
+      '<span class="b-size">' + formatSize(entry.file.size) + '</span>' +
+      '<span class="b-status ' + statusClass + '">' + statusText + '</span>' +
+      '<button class="b-remove" data-idx="' + idx + '" title="移除">&#x2715;</button>';
+    batchFileList.appendChild(div);
+  });
+  btnBatchProcess.disabled = state.batchFiles.length === 0 || state.isProcessing;
+  btnBatchClear.disabled = state.batchFiles.length === 0;
+  batchFileList.querySelectorAll('.b-remove').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.batchFiles.splice(parseInt(btn.dataset.idx, 10), 1);
+      renderBatchList();
+    });
+  });
+}
+
+function escapeHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+btnBatchProcess.addEventListener('click', async function () {
+  if (state.batchFiles.length === 0 || state.isProcessing) return;
+  state.isProcessing = true;
+  btnBatchProcess.disabled = true;
+  batchProgress.style.display = '';
+  batchProgressText.style.display = '';
+  batchProgressText.textContent = '准备中...';
+
+  var convDirection = $('convDirection').value;
+  var cleanVals = getCleanVals();
+  var removeVals = getRemoveVals();
+  var customPatterns = $('customRemovePatterns').value;
+  var useRegex = $('useRegex').checked;
+  var results = [];
+  var total = state.batchFiles.length;
+
+  for (var i = 0; i < total; i++) {
+    var entry = state.batchFiles[i];
+    entry.status = 'run';
+    renderBatchList();
+    batchProgressText.textContent = '正在处理 (' + (i + 1) + '/' + total + ')：' + entry.file.name;
+    try {
+      var text = await readFileText(entry.file);
+      var processed = await processChunks(text, function (chunk) {
+        var t = convertText(chunk, convDirection);
+        t = cleanText(t, cleanVals);
+        t = removeText(t, removeVals, customPatterns, useRegex);
+        return t;
+      }, null);
+      processed = crossLineClean(processed, cleanVals);
+      entry.status = 'ok';
+      results.push({ name: entry.file.name, text: processed });
+    } catch (e) {
+      entry.status = 'err';
+      console.error('Batch item failed:', e);
+      showToast('处理失败：' + entry.file.name, 'error');
+    }
+    renderBatchList();
+    batchProgressBar.style.width = Math.round(((i + 1) / total) * 100) + '%';
+  }
+
+  batchProgressText.textContent = '打包中...';
+  await new Promise(function (r) { setTimeout(r, 30); });
+
+  try {
+    if (typeof JSZip !== 'undefined') {
+      var zip = new JSZip();
+      results.forEach(function (r) {
+        var base = r.name.replace(/\.[^.]+$/, '');
+        var ext = r.name.split('.').pop() || 'txt';
+        zip.file(base + '_processed.' + ext, r.text);
+      });
+      var blob = await zip.generateAsync({ type: 'blob' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'batch_processed_' + Date.now() + '.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('批量处理完成，已下载 ZIP（' + results.length + ' 个文件）', 'success');
+    } else {
+      results.forEach(function (r) {
+        var base = r.name.replace(/\.[^.]+$/, '');
+        var ext = r.name.split('.').pop() || 'txt';
+        downloadTextFile(r.text, base + '_processed.' + ext);
+      });
+      showToast('批量处理完成（JSZip 未加载，已逐个下载）', 'success');
+    }
+  } catch (e) {
+    console.error('ZIP failed:', e);
+    showToast('打包失败：' + e.message, 'error');
+  }
+
+  batchProgress.style.display = 'none';
+  batchProgressText.style.display = 'none';
+  batchProgressBar.style.width = '0%';
+  state.isProcessing = false;
+  renderBatchList();
+});
+
+function readFileText(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function (e) { resolve(e.target.result); };
+    reader.onerror = function () { reject(new Error('读取失败')); };
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+// ========================
+//  THEME
+// ========================
+themeToggle.addEventListener('click', function () {
+  var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  saveSettings();
 });
 
 // ========================
 //  TOAST
 // ========================
-function showToast(msg, type = 'success') {
-  const toast = document.createElement('div');
+function showToast(msg, type) {
+  type = type || 'success';
+  var toast = document.createElement('div');
   toast.className = 'toast ' + type;
   toast.textContent = msg;
   toastContainer.appendChild(toast);
-  setTimeout(() => {
+  setTimeout(function () {
     toast.style.opacity = '0';
     toast.style.transform = 'translateX(100%)';
-    toast.style.transition = '0.3s';
-    setTimeout(() => toast.remove(), 300);
-  }, 2500);
+    setTimeout(function () { toast.remove(); }, 350);
+  }, 2600);
 }
 
 // ========================
 //  KEYBOARD SHORTCUTS
 // ========================
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', function (e) {
+  var tag = (e.target.tagName || '').toLowerCase();
+  var isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     btnProcessAll.click();
   }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !isInput) {
+    e.preventDefault();
+    undo();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    redo();
+  }
 });
+
+// ========================
+//  INIT
+// ========================
+loadSettings();
+$('convDirection').addEventListener('change', saveSettings);
+$('useRegex').addEventListener('change', saveSettings);
+$('customRemovePatterns').addEventListener('input', saveSettings);
+$('findRegex').addEventListener('change', function () { $('findResult').textContent = '替换会作用于「处理后文本」，可撤销'; });
+$('btnFindCount').addEventListener('click', findCount);
+$('btnReplaceAll').addEventListener('click', findReplaceAll);
+$('btnBatchSelect').addEventListener('click', function () { batchFileInput.click(); });
 
 console.log('📖 文简书斋 loaded — 所有处理在浏览器本地完成');
 </script>
