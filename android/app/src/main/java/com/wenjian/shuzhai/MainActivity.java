@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.View;
-import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -29,9 +28,9 @@ import java.nio.charset.StandardCharsets;
  * 文简书斋 · 电子书处理工具 —— WebView 壳
  * 加载 assets/ebook-tool.html，提供原生文件保存与文件选择能力。
  *
- * 系统栏方案（v2）：放弃沉浸式布局与 CSS safe-area（WebView 对 env() 支持不可靠），
- * 改为标准布局：状态栏独立显示并与页面 header 同色，页面内容始终从状态栏下方开始，
- * 顶部标题不会被遮挡。
+ * 系统栏方案（v4 保守版）：仅使用 API 21+ 的基础方法（setStatusBarColor /
+ * setNavigationBarColor / SYSTEM_UI_FLAG 常量），不引用任何高版本系统栏类，
+ * 避免旧设备上类验证导致的闪退。状态栏与页面 header 同色，内容从状态栏下方开始。
  */
 public class MainActivity extends Activity {
 
@@ -62,6 +61,11 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return false;
+            }
+
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                toast("页面加载失败：" + description);
             }
         });
 
@@ -96,21 +100,19 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 网页主题切换时同步系统导航栏外观（状态栏恒为深色+白图标，无需跟随） */
+    /**
+     * 主题切换时同步导航栏颜色与图标。
+     * 只用 API 21+ 方法与编译期常量（SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR 在
+     * API 26 以下无效果但不报错），不引用高版本系统栏类。
+     */
     private void applyThemeBars(boolean dark) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             getWindow().setNavigationBarColor(dark ? NAV_BAR_DARK : NAV_BAR_LIGHT);
-            WindowInsetsController c = getWindow().getInsetsController();
-            if (c != null) {
-                // 状态栏：恒为深色背景 → 白色图标（不清除 LIGHT_STATUS_BARS）
-                c.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
-                // 导航栏：浅色主题米色背景 → 深色图标；深色主题墨色背景 → 白色图标
-                c.setSystemBarsAppearance(dark ? 0 : WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
-                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            int flags = 0;
+            if (!dark) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setNavigationBarColor(dark ? NAV_BAR_DARK : NAV_BAR_LIGHT);
-            getWindow().getDecorView().setSystemUiVisibility(dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            getWindow().getDecorView().setSystemUiVisibility(flags);
         }
     }
 
