@@ -5,11 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>文简书斋 · 电子书处理工具</title>
 <meta name="description" content="简繁转换、文本净化、自定义去除、查找替换、批量处理 —— 所有处理在浏览器本地完成">
-<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
-
 /* ===== THEME ===== */
 :root {
   --ink: #1a1a1a;
@@ -66,7 +62,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: -apple-system, 'Noto Sans CJK SC', 'Source Han Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--paper);
   background-image: var(--bg-tex);
   color: var(--ink);
@@ -111,7 +107,7 @@ body {
   box-shadow: 0 2px 8px rgba(201,169,110,0.3);
 }
 .header-title {
-  font-family: 'Noto Serif SC', serif;
+  font-family: 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif SC', serif;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1049,6 +1045,44 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+// ========================
+//  CDN LIB LOADER（不阻塞首屏，按需/后台加载）
+// ========================
+var openccLoaded = false;
+var jszipPromise = null;
+
+function loadScript(src, timeoutMs) {
+  return new Promise(function (resolve) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function () { s.dataset.done = '1'; resolve(true); };
+    s.onerror = function () { s.dataset.done = '1'; resolve(false); };
+    setTimeout(function () {
+      if (!s.dataset.done) { s.dataset.done = '1'; resolve(false); }
+    }, timeoutMs || 8000);
+    document.head.appendChild(s);
+  });
+}
+
+// 确保 OpenCC 可用（异步；不可用时回退内置引擎，功能不受影响）
+function ensureOpenCC() {
+  if (typeof OpenCC !== 'undefined') { openccLoaded = true; return Promise.resolve(true); }
+  if (openccLoaded) return Promise.resolve(true);
+  return loadScript('https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js', 8000).then(function (ok) {
+    openccLoaded = ok && typeof OpenCC !== 'undefined';
+    if (openccLoaded) updateEngineBadge();
+    return openccLoaded;
+  });
+}
+
+// 确保 JSZip 可用（仅批量打包时按需加载；失败回退逐个下载）
+function ensureJSZip() {
+  if (typeof JSZip !== 'undefined') return Promise.resolve(true);
+  if (jszipPromise) return jszipPromise;
+  jszipPromise = loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 8000);
+  return jszipPromise;
+}
+
 // ========================
 //  STATE
 // ========================
@@ -2132,8 +2166,10 @@ btnBatchProcess.addEventListener('click', async function () {
   batchProgressText.textContent = '打包中...';
   await new Promise(function (r) { setTimeout(r, 30); });
 
+  var zipReady = await ensureJSZip();
+
   try {
-    if (typeof JSZip !== 'undefined') {
+    if (zipReady) {
       var zip = new JSZip();
       results.forEach(function (r) {
         var safeName = sanitizeFilename(decodeFilename(r.name));
@@ -2152,7 +2188,7 @@ btnBatchProcess.addEventListener('click', async function () {
         var ext = safeName.split('.').pop() || 'txt';
         downloadFile(r.text, base + '_processed.' + ext);
       });
-      showToast('批量处理完成（JSZip 未加载，已逐个下载）', 'success');
+      showToast('批量处理完成（JSZip 不可用，已逐个下载）', 'success');
     }
   } catch (e) {
     console.error('ZIP failed:', e);
@@ -2252,6 +2288,8 @@ function updateEngineBadge() {
 // ========================
 loadSettings();
 updateEngineBadge();
+// 后台预加载 OpenCC（不阻塞首屏，加载完成后自动升级引擎）
+ensureOpenCC();
 $('convDirection').addEventListener('change', saveSettings);
 $('convEnabled').addEventListener('change', function () {
   updateConvUI();
