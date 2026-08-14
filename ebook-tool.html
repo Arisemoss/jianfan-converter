@@ -587,6 +587,10 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   margin: -6px 0 10px;
   line-height: 1.5;
 }
+.download-copy-row {
+  text-align: center;
+  margin-bottom: 10px;
+}
 .download-tips {
   list-style: none;
   margin: 0 0 18px;
@@ -940,7 +944,10 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
     <span class="dl-icon">&#x2705;</span>
     <h3>下载完成</h3>
     <div class="download-filename" id="dlFileName">-</div>
-    <p class="download-rename-hint">提示：若保存后的文件名变成随机字符，请将文件重命名为上方名称</p>
+    <div class="download-copy-row">
+      <button class="btn btn-outline btn-sm" id="btnCopyFileName">&#x1F4CB; 复制文件名</button>
+    </div>
+    <p class="download-rename-hint">提示：若保存后的文件名变成随机字符（如 137ffca...，部分浏览器的限制），请复制上方名称并重命名文件</p>
     <p class="download-hint" id="dlHint"></p>
     <ul class="download-tips" id="dlTips"></ul>
     <button class="btn btn-primary" id="btnDownloadClose">知道了</button>
@@ -1700,7 +1707,7 @@ btnDownload.addEventListener('click', function () {
   if (!state.processedText) return;
   var text = state.processedText;
   var ext = state.fileName.split('.').pop() || 'txt';
-  var baseName = state.fileName.replace(/.[^.]+$/, '');
+  var baseName = state.fileName.replace(/\.[^.]+$/, '');
   downloadFile(text, baseName + '_processed.' + ext);
 });
 
@@ -1732,11 +1739,13 @@ async function downloadFile(data, filename, mime) {
     }
   }
 
-  if (navigator.canShare && navigator.share) {
+  if (navigator.share) {
     try {
       var file = new File([data], filename, { type: mime });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
+      var shareData = { files: [file], title: filename };
+      var canShareFiles = navigator.canShare ? navigator.canShare(shareData) : true;
+      if (canShareFiles) {
+        await navigator.share(shareData);
         showToast('已分享：' + filename, 'success');
         return;
       }
@@ -1811,6 +1820,28 @@ function showDownloadGuide(filename) {
 
 $('btnDownloadClose').addEventListener('click', function () {
   downloadOverlay.classList.remove('active');
+});
+
+$('btnCopyFileName').addEventListener('click', function () {
+  var name = dlFileName.textContent;
+  if (!name) return;
+  var done = function () {
+    this.textContent = '\u2713 已复制文件名';
+    var btn = this;
+    setTimeout(function () { btn.textContent = '\u1F4CB 复制文件名'; }, 2000);
+  }.bind(this);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(name).then(done).catch(function () { done(); });
+  } else {
+    // 降级：textarea 选中复制
+    var ta = document.createElement('textarea');
+    ta.value = name;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (err) { /* 忽略 */ }
+    document.body.removeChild(ta);
+    done();
+  }
 });
 
 btnCopyResult.addEventListener('click', async function () {
