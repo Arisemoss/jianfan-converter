@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>文简书斋 · 电子书处理工具</title>
 <meta name="description" content="简繁转换、文本净化、自定义去除、查找替换、批量处理 —— 所有处理在浏览器本地完成">
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
@@ -92,7 +92,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 14px 32px;
-  padding-top: max(14px, env(safe-area-inset-top));
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -657,7 +657,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 }
 @media (max-width: 640px) {
   .container { padding: 20px 16px; }
-  .header-inner { padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
+  .header-inner { padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
   .header-title { font-size: 18px; }
   .header-badge { display: none; }
   .upload-zone { padding: 36px 20px; }
@@ -1486,7 +1486,9 @@ document.querySelectorAll('[data-toggle]').forEach(function (header) {
 //  CHECKBOX TOGGLE
 // ========================
 document.querySelectorAll('.checkbox-item').forEach(function (item) {
-  item.addEventListener('click', function () {
+  item.addEventListener('click', function (e) {
+    // 阻止 label 默认行为（模拟点击 input）造成 checked 双重翻转，保证可多选
+    e.preventDefault();
     item.classList.toggle('active');
     item.querySelector('input').checked = item.classList.contains('active');
     saveSettings();
