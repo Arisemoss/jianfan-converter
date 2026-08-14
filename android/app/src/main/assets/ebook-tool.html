@@ -639,6 +639,50 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ===== ABOUT CARD ===== */
+.about-card {
+  background: var(--paper-light);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 92%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  animation: cardIn 0.25s ease;
+  text-align: center;
+}
+.about-card h3 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.about-desc {
+  font-size: 12px;
+  color: var(--warm-gray);
+  margin-bottom: 14px;
+}
+.about-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
+}
+.about-row:last-of-type { border-bottom: none; }
+.about-row span { color: var(--warm-gray); }
+.about-row strong { color: var(--ink); font-weight: 600; }
+.about-link {
+  color: var(--gold-dark);
+  word-break: break-all;
+  font-size: 12px;
+}
+.about-note {
+  font-size: 11px;
+  color: var(--warm-gray);
+  margin: 12px 0 16px;
+  line-height: 1.6;
+}
+
 /* ===== FOOTER ===== */
 .footer {
   text-align: center;
@@ -650,6 +694,20 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 }
 .footer a { color: var(--gold-dark); text-decoration: none; border-bottom: 1px dashed var(--gold-dark); }
 .footer a:hover { color: var(--vermillion); }
+.footer-links { margin-top: 10px; }
+.footer-links a {
+  font-size: 12px;
+  border-bottom: none;
+  background: var(--paper-dark);
+  padding: 4px 14px;
+  border-radius: 14px;
+  display: inline-block;
+  transition: var(--transition);
+}
+.footer-links a:hover {
+  background: rgba(201, 169, 110, 0.2);
+  border-bottom: none;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 960px) {
@@ -940,6 +998,9 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 <!-- Footer -->
 <div class="footer">
   文简书斋 &middot; 电子书处理工具 &mdash; 所有处理在浏览器本地完成，文件不会上传至服务器
+  <div class="footer-links">
+    <a href="javascript:void(0)" id="aboutLink">&#x2139;&#xFE0F; 关于</a>
+  </div>
 </div>
 
 <!-- Processing Overlay -->
@@ -964,6 +1025,23 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
     <p class="download-hint" id="dlHint"></p>
     <ul class="download-tips" id="dlTips"></ul>
     <button class="btn btn-primary" id="btnDownloadClose">知道了</button>
+  </div>
+</div>
+
+<!-- About Modal -->
+<div class="download-overlay" id="aboutOverlay">
+  <div class="about-card">
+    <span class="dl-icon">&#x1F4D6;</span>
+    <h3>关于 文简书斋</h3>
+    <p class="about-desc">电子书处理工具 &middot; 简繁转换 / 文本净化 / 自定义去除 / 查找替换 / 批量处理</p>
+    <div class="about-row"><span>作者</span><strong>Arisemoss</strong></div>
+    <div class="about-row"><span>版本</span><strong>v1.0</strong></div>
+    <div class="about-row"><span>开源地址</span><strong class="about-link" id="aboutRepo">https://github.com/Arisemoss/jianfan-converter</strong></div>
+    <p class="about-note">所有处理（读取、转换、统计、下载）均在本地完成，文件不会上传至任何服务器。</p>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button class="btn btn-outline" id="btnCopyRepo">&#x1F4CB; 复制地址</button>
+      <button class="btn btn-primary" id="btnAboutClose">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -1857,6 +1935,45 @@ function showDownloadGuide(filename) {
 
 $('btnDownloadClose').addEventListener('click', function () {
   downloadOverlay.classList.remove('active');
+});
+
+// ========================
+//  ABOUT
+// ========================
+var aboutOverlay = $('aboutOverlay');
+var aboutRepo = $('aboutRepo');
+
+$('aboutLink').addEventListener('click', function () {
+  aboutOverlay.classList.add('active');
+});
+
+$('btnAboutClose').addEventListener('click', function () {
+  aboutOverlay.classList.remove('active');
+});
+
+// 点击遮罩关闭
+aboutOverlay.addEventListener('click', function (e) {
+  if (e.target === aboutOverlay) aboutOverlay.classList.remove('active');
+});
+
+$('btnCopyRepo').addEventListener('click', function () {
+  var url = aboutRepo.textContent;
+  var done = function () {
+    this.textContent = '\u2713 已复制';
+    var btn = this;
+    setTimeout(function () { btn.textContent = '\u1F4CB 复制地址'; }, 2000);
+  }.bind(this);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(function () { done(); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (err) { /* 忽略 */ }
+    document.body.removeChild(ta);
+    done();
+  }
 });
 
 $('btnCopyFileName').addEventListener('click', function () {
