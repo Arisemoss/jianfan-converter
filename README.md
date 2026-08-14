@@ -12,7 +12,7 @@
 
 | 模块 | 说明 |
 |---|---|
-| 简繁转换 | 基于 [OpenCC](https://github.com/BYVoid/OpenCC)（opencc-js），支持 6 种方向：简↔繁、简↔香港繁体、简↔台湾正体 |
+| 简繁转换 | 双引擎：优先 [OpenCC](https://github.com/BYVoid/OpenCC)（opencc-js，词级准确），CDN 不可用时自动切换内置引擎（内嵌 OpenCC 词典 8000+ 字映射，离线可用）。支持 6 种方向：简↔繁、简↔香港繁体、简↔台湾正体 |
 | 文本净化 | 清除空白行、合并多余空格、统一标点、清除特殊符号/网址/邮箱/零宽字符、Tab 转空格等 10 项 |
 | 自定义去除 | 快速去除 HTML 标签/数字/英文/标点，或按行输入关键词 / 正则表达式批量删除 |
 | 查找替换 | 对处理后文本进行查找替换，支持正则、区分大小写，可统计匹配数 |
@@ -39,7 +39,7 @@
 - [opencc-js](https://cdn.jsdelivr.net/npm/opencc-js@1.0.5) —— 简繁转换引擎（CDN）
 - [JSZip](https://cdn.jsdelivr.net/npm/jszip@3.10.1) —— 批量打包（CDN，可选）
 
-> 注意：OpenCC 与 JSZip 从 CDN 加载，首次使用需联网。核心处理逻辑不依赖网络；离线时 OpenCC 缺失则跳过转换并使用内置繁体字表统计。
+> 注意：OpenCC 与 JSZip 从 CDN 加载，首次使用需联网。简繁转换内置离线引擎：OpenCC 加载失败时自动使用内嵌词典转换，不会静默跳过。
 
 ## 隐私
 
