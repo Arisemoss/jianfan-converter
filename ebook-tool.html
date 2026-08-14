@@ -1636,33 +1636,52 @@ btnDownload.addEventListener('click', function () {
   if (!state.processedText) return;
   var text = state.processedText;
   var ext = state.fileName.split('.').pop() || 'txt';
-  var baseName = state.fileName.replace(/\.[^.]+$/, '');
-  downloadTextFile(text, baseName + '_processed.' + ext);
+  var baseName = state.fileName.replace(/.[^.]+$/, '');
+  downloadFile(text, baseName + '_processed.' + ext);
 });
 
-// 优先使用 File System Access API（Chrome/Edge 桌面版）：让用户明确选择保存位置
-// 不支持或用户取消时回退到传统下载 + 引导提示
-async function downloadTextFile(text, filename) {
+// 下载统一入口，按环境选择最可靠的保存方式：
+// 1) 保存对话框（桌面 Chrome/Edge，用户明确选择位置）
+// 2) 系统分享（移动端 Android/iOS，可保存到文件管理器 / 存储到文件）
+// 3) 传统浏览器下载（blob + a.download）+ 引导卡片
+async function downloadFile(data, filename, mime) {
+  mime = mime || 'text/plain;charset=utf-8';
+  var ext = filename.split('.').pop() || 'txt';
+
   if (window.showSaveFilePicker) {
     try {
+      var accept = {};
+      accept[mime] = ['.' + ext];
       var handle = await window.showSaveFilePicker({
         suggestedName: filename,
-        types: [{
-          description: '文本文件',
-          accept: { 'text/plain': ['.txt', '.html', '.htm', '.md', '.csv', '.json', '.xml'] }
-        }]
+        types: [{ description: '文件', accept: accept }]
       });
       var writable = await handle.createWritable();
-      await writable.write(text);
+      await writable.write(data);
       await writable.close();
       showToast('已保存：' + handle.name, 'success');
       return;
     } catch (e) {
       if (e && e.name === 'AbortError') return; // 用户取消保存对话框
-      console.warn('showSaveFilePicker failed, fallback to download:', e);
+      console.warn('showSaveFilePicker failed, fallback:', e);
     }
   }
-  var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+
+  if (navigator.canShare && navigator.share) {
+    try {
+      var file = new File([data], filename, { type: mime });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        showToast('已分享：' + filename, 'success');
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // 用户取消分享
+      console.warn('Web Share failed, fallback to download:', e);
+    }
+  }
+
+  var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
@@ -1670,7 +1689,8 @@ async function downloadTextFile(text, filename) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // 延迟回收 blob URL：部分浏览器在下载完成前 revoke 会导致文件中断/丢失
+  setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   showToast('已开始下载：' + filename, 'success');
   showDownloadGuide(filename);
 }
@@ -1871,21 +1891,13 @@ btnBatchProcess.addEventListener('click', async function () {
       });
       var blob = await zip.generateAsync({ type: 'blob' });
       var zipName = 'batch_processed_' + Date.now() + '.zip';
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = zipName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('批量处理完成，已下载 ZIP（' + results.length + ' 个文件）', 'success');
-      showDownloadGuide(zipName);
+      showToast('批量处理完成（' + results.length + ' 个文件）', 'success');
+      downloadFile(blob, zipName, 'application/zip');
     } else {
       results.forEach(function (r) {
         var base = r.name.replace(/\.[^.]+$/, '');
         var ext = r.name.split('.').pop() || 'txt';
-        downloadTextFile(r.text, base + '_processed.' + ext);
+        downloadFile(r.text, base + '_processed.' + ext);
       });
       showToast('批量处理完成（JSZip 未加载，已逐个下载）', 'success');
     }
