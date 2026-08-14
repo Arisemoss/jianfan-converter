@@ -1496,11 +1496,11 @@ document.querySelectorAll('[data-toggle]').forEach(function (header) {
 //  CHECKBOX TOGGLE
 // ========================
 document.querySelectorAll('.checkbox-item').forEach(function (item) {
-  item.addEventListener('click', function (e) {
-    // 阻止 label 默认行为（模拟点击 input）造成 checked 双重翻转，保证可多选
-    e.preventDefault();
-    item.classList.toggle('active');
-    item.querySelector('input').checked = item.classList.contains('active');
+  var input = item.querySelector('input');
+  // 原生 checkbox change 事件同步样式：切换行为由浏览器原生保证（各平台一致），
+  // 避免 label 模拟点击在 WebView 中的差异导致多选失效
+  input.addEventListener('change', function () {
+    item.classList.toggle('active', input.checked);
     saveSettings();
   });
 });

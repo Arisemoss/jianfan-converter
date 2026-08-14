@@ -28,16 +28,21 @@ import java.nio.charset.StandardCharsets;
 /**
  * 文简书斋 · 电子书处理工具 —— WebView 壳
  * 加载 assets/ebook-tool.html，提供原生文件保存与文件选择能力。
- * 沉浸式状态栏：header 深色背景自然延伸，页面顶部视觉统一。
+ *
+ * 系统栏方案（v2）：放弃沉浸式布局与 CSS safe-area（WebView 对 env() 支持不可靠），
+ * 改为标准布局：状态栏独立显示并与页面 header 同色，页面内容始终从状态栏下方开始，
+ * 顶部标题不会被遮挡。
  */
 public class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST = 1001;
-    /** 页面 header 深色（浅色主题） */
+    /** 页面 header 深色（两种主题下 header 均为深色） */
+    private static final int STATUS_BAR_COLOR = Color.parseColor("#1a1a1a");
+    /** 浅色主题导航栏：页面背景米色 */
     private static final int NAV_BAR_LIGHT = Color.parseColor("#f5f0e6");
-    /** 页面背景米色 */
+    /** 深色主题导航栏：页面背景墨色 */
     private static final int NAV_BAR_DARK = Color.parseColor("#16130f");
 
     @Override
@@ -82,48 +87,30 @@ public class MainActivity extends Activity {
         webView.loadUrl("file:///android_asset/ebook-tool.html");
     }
 
-    /** 沉浸式状态栏 + 透明导航栏：页面背景/header 延伸到系统栏，主题由网页桥接控制 */
+    /** 标准布局：状态栏与 header 同色（深色+白图标），导航栏按当前主题着色 */
     private void setupSystemBars() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-            getWindow().setNavigationBarColor(Color.TRANSPARENT);
-            getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController c = getWindow().getInsetsController();
-            if (c != null) {
-                // 状态栏：header 恒为深色 → 白色图标
-                c.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
-                // 导航栏：浅色主题 → 深色图标
-                c.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
-                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-            getWindow().setNavigationBarColor(Color.TRANSPARENT);
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(STATUS_BAR_COLOR);
+            getWindow().setNavigationBarColor(NAV_BAR_LIGHT);
+            applyThemeBars(false);
         }
     }
 
-    /** 网页主题切换时同步系统栏外观（深色模式导航栏图标变浅色） */
+    /** 网页主题切换时同步系统导航栏外观（状态栏恒为深色+白图标，无需跟随） */
     private void applyThemeBars(boolean dark) {
-        int navBarColor = dark ? NAV_BAR_DARK : NAV_BAR_LIGHT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setNavigationBarColor(navBarColor);
+            getWindow().setNavigationBarColor(dark ? NAV_BAR_DARK : NAV_BAR_LIGHT);
             WindowInsetsController c = getWindow().getInsetsController();
             if (c != null) {
+                // 状态栏：恒为深色背景 → 白色图标（不清除 LIGHT_STATUS_BARS）
+                c.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+                // 导航栏：浅色主题米色背景 → 深色图标；深色主题墨色背景 → 白色图标
                 c.setSystemBarsAppearance(dark ? 0 : WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
                         WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setNavigationBarColor(navBarColor);
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | (dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+            getWindow().setNavigationBarColor(dark ? NAV_BAR_DARK : NAV_BAR_LIGHT);
+            getWindow().getDecorView().setSystemUiVisibility(dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         }
     }
 
