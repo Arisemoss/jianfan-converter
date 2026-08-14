@@ -580,6 +580,13 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   color: var(--ink-light);
   margin-bottom: 8px;
 }
+.download-rename-hint {
+  font-size: 11px;
+  color: var(--warm-gray);
+  text-align: center;
+  margin: -6px 0 10px;
+  line-height: 1.5;
+}
 .download-tips {
   list-style: none;
   margin: 0 0 18px;
@@ -933,6 +940,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
     <span class="dl-icon">&#x2705;</span>
     <h3>下载完成</h3>
     <div class="download-filename" id="dlFileName">-</div>
+    <p class="download-rename-hint">提示：若保存后的文件名变成随机字符，请将文件重命名为上方名称</p>
     <p class="download-hint" id="dlHint"></p>
     <ul class="download-tips" id="dlTips"></ul>
     <button class="btn btn-primary" id="btnDownloadClose">知道了</button>
@@ -1041,6 +1049,26 @@ function decodeFilename(name) {
   }
   return s;
 }
+
+// 无意义文件名检测：纯十六进制 hash（如 137ffca1746c4376b6af5f0d4bc345c2.txt）
+function looksLikeHash(name) {
+  var base = String(name || '').replace(/\.[^.]+$/, '');
+  return /^[0-9a-f]{8,}$/i.test(base);
+}
+
+// 从文本中提取标题：第一个有意义的非空行（跳过分隔线），去除行首序号/标点
+function extractTitle(text) {
+  if (!text) return '';
+  var lines = String(text).split('\n');
+  for (var i = 0; i < lines.length && i < 50; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    if (/^[-_=*~\u00b7.\s]{3,}$/.test(line)) continue;
+    return line.replace(/^[\s\d.-—_、。\u00b7:：]+/, '').replace(/\s+/g, ' ').slice(0, 40);
+  }
+  return '';
+}
+
 
 
 
@@ -1316,6 +1344,15 @@ function handleFile(file) {
   reader.onload = function (e) {
     state.rawText = e.target.result;
     state.processedText = '';
+    // 无意义 hash 文件名：用内容首行作为标题重命名
+    if (looksLikeHash(state.fileName)) {
+      var title = extractTitle(state.rawText);
+      if (title) {
+        var oldExt = state.fileName.split('.').pop() || 'txt';
+        state.fileName = sanitizeFilename(title + '.' + oldExt);
+        showToast('文件名无意义，已按内容重命名为：' + state.fileName, 'info');
+      }
+    }
     if ((state.rawText.match(/\uFFFD/g) || []).length > Math.max(10, state.rawText.length * 0.001)) {
       showToast('检测到大量乱码字符，文件可能不是 UTF-8 编码（如 GBK），请先转换编码', 'error');
     }
