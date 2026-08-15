@@ -59,6 +59,14 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        // 关闭 WebView 自动算法暗色：页面明暗由 data-theme 完全控制，
+        // 避免系统深色模式下页面被算法再变暗一次（双重变暗、颜色失真）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            s.setForceDarkAllowed(false);
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            s.setAlgorithmicDarkeningAllowed(false);
+        }
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
