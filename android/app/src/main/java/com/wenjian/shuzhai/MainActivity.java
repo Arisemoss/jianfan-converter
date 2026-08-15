@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -26,7 +27,9 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * 文简书斋 · 电子书处理工具 —— WebView 壳
- * 加载 assets/ebook-tool.html，提供原生文件保存与文件选择能力。
+ * 加载 assets/ebook-tool.html，提供原生文件保存 / 分享 / 打开 / 文件选择能力。
+ * 保存统一走 MediaStore 拿到 content URI，再通过系统分享面板与「打开方式」
+ * 选择器交给其他应用（微信、QQ、MT 管理器等），避免 file:// 暴露限制。
  *
  * 系统栏方案（v4 保守版）：仅使用 API 21+ 的基础方法（setStatusBarColor /
  * setNavigationBarColor / SYSTEM_UI_FLAG 常量），不引用任何高版本系统栏类，
@@ -150,49 +153,137 @@ public class MainActivity extends Activity {
 
     /**
      * 网页下载桥接：把文本内容以指定文件名保存到系统「下载」目录。
-     * 返回保存后的路径（空字符串表示失败）。
+     * 返回 content URI 字符串（空字符串表示失败），网页端据此提供「分享 / 打开」。
      */
     class NativeBridge {
+
         @JavascriptInterface
         public String saveText(String text, String filename) {
             try {
-                String savedPath;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    ContentValues values = new ContentValues();
-                    values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
-                    values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
-                    values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
-                    Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-                    if (uri == null) {
-                        toast("保存失败：无法创建下载条目");
-                        return "";
-                    }
-                    OutputStream os = getContentResolver().openOutputStream(uri);
-                    if (os == null) {
-                        toast("保存失败：无法打开输出流");
-                        return "";
-                    }
-                    os.write(text.getBytes(StandardCharsets.UTF_8));
-                    os.close();
-                    savedPath = Environment.DIRECTORY_DOWNLOADS + "/" + filename;
-                } else {
-                    File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                    if (!dir.exists()) {
-                        dir.mkdirs();
-                    }
-                    File file = new File(dir, filename);
-                    FileOutputStream fos = new FileOutputStream(file);
-                    fos.write(text.getBytes(StandardCharsets.UTF_8));
-                    fos.close();
-                    savedPath = file.getAbsolutePath();
-                }
-                toast("已保存：" + filename);
-                return savedPath;
+                return saveBytes(text.getBytes(StandardCharsets.UTF_8), filename, "text/plain");
             } catch (Exception e) {
                 e.printStackTrace();
                 toast("保存失败：" + e.getMessage());
                 return "";
             }
+        }
+
+        /**
+         * 保存二进制内容（批量打包的 zip 等），网页端以 dataURL 形式传入。
+         * 返回 content URI 字符串（空字符串表示失败）。
+         */
+        @JavascriptInterface
+        public String saveBase64(String base64DataUrl, String filename, String mime) {
+            try {
+                String b64 = base64DataUrl;
+                int comma = b64.indexOf(',');
+                if (comma >= 0) b64 = b64.substring(comma + 1);
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                return saveBytes(bytes, filename, mime);
+            } catch (Exception e) {
+                e.printStackTrace();
+                toast("保存失败：" + e.getMessage());
+                return "";
+            }
+        }
+
+        /** 统一保存字节到系统「下载」目录，返回 content URI 字符串（空表示失败）。 */
+        private String saveBytes(byte[] bytes, String filename, String mime) throws Exception {
+            String cleanMime = cleanMime(mime);
+
+            String savedUri;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, cleanMime);
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (uri == null) {
+                    toast("保存失败：无法创建下载条目");
+                    return "";
+                }
+                OutputStream os = getContentResolver().openOutputStream(uri);
+                if (os == null) {
+                    toast("保存失败：无法打开输出流");
+                    return "";
+                }
+                os.write(bytes);
+                os.close();
+                savedUri = uri.toString();
+            } else {
+                // API 24-28：写入公共下载目录后注册到媒体库，换取 content URI
+                // （分享/打开需要 content URI，file:// 在 API 24+ 会被拦截）
+                File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+                File file = new File(dir, filename);
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(bytes);
+                fos.close();
+                try {
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Files.FileColumns.DATA, file.getAbsolutePath());
+                    values.put(MediaStore.Files.FileColumns.DISPLAY_NAME, filename);
+                    values.put(MediaStore.Files.FileColumns.MIME_TYPE, cleanMime);
+                    Uri inserted = getContentResolver().insert(MediaStore.Files.getContentUri("external"), values);
+                    savedUri = inserted != null ? inserted.toString() : Uri.fromFile(file).toString();
+                } catch (Exception e) {
+                    savedUri = Uri.fromFile(file).toString();
+                }
+            }
+            toast("已保存：" + filename);
+            return savedUri;
+        }
+
+        /** 分享已保存的文件到其他应用（微信、QQ、文件管理等）。 */
+        @JavascriptInterface
+        public void shareFile(final String uriString, final String filename, final String mime) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Uri uri = Uri.parse(uriString);
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType(cleanMime(mime));
+                        send.putExtra(Intent.EXTRA_STREAM, uri);
+                        send.putExtra(Intent.EXTRA_SUBJECT, filename);
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(send, "分享 " + filename));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        toast("分享失败：" + e.getMessage());
+                    }
+                }
+            });
+        }
+
+        /** 用其他应用打开已保存的文件（MT 管理器、微信、阅读器等）。 */
+        @JavascriptInterface
+        public void openFile(final String uriString, final String filename, final String mime) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Uri uri = Uri.parse(uriString);
+                        Intent view = new Intent(Intent.ACTION_VIEW);
+                        view.setDataAndType(uri, cleanMime(mime));
+                        view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(view, "用其他应用打开 " + filename));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        toast("打开失败：" + e.getMessage());
+                    }
+                }
+            });
+        }
+
+        /** 去掉 MIME 的参数部分（如 text/plain;charset=utf-8 → text/plain）。 */
+        private String cleanMime(String mime) {
+            String m = mime;
+            int semi = m.indexOf(';');
+            if (semi > 0) m = m.substring(0, semi).trim();
+            return m.isEmpty() ? "text/plain" : m;
         }
 
         @JavascriptInterface

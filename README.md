@@ -14,7 +14,8 @@
 android/ 目录是一个零第三方依赖的手写 WebView 壳：
 
 - MainActivity.java 加载 assets/ebook-tool.html，支持文件上传（系统文件选择器）
-- **原生下载桥接** AndroidBridge.saveText()：文件直接保存到系统「下载」目录，文件名完全可控，不存在 WebView 中 blob 下载产生随机文件名的问题
+- **原生下载桥接** AndroidBridge.saveText() / saveBase64()：文件直接保存到系统「下载」目录，文件名完全可控，不存在 WebView 中 blob 下载产生随机文件名的问题（批量 ZIP 也走原生保存）
+- **导出低门槛**：保存后可在应用内一键「分享到其他应用」（微信、QQ 等）或「用其他应用打开」（MT 管理器等），无需去文件管理器翻找
 - 完全离线可用（HTML 已内嵌 OpenCC 词典）
 - 本地构建：cd android && ./gradlew assembleDebug（需 JDK 17 + Android SDK）
 - CI 构建：push 自动触发 .github/workflows/build-apk.yml，产物为 workflow artifact
