@@ -589,6 +589,12 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   text-align: center;
   margin-bottom: 10px;
 }
+.download-actions {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.download-actions .btn { flex: 1; width: auto; }
 .download-tips {
   list-style: none;
   margin: 0 0 18px;
@@ -1020,6 +1026,10 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
     <p class="download-rename-hint">提示：若保存后的文件名变成随机字符（如 137ffca...，部分浏览器的限制），请复制上方名称并重命名文件</p>
     <p class="download-hint" id="dlHint"></p>
     <ul class="download-tips" id="dlTips"></ul>
+    <div class="download-actions" id="dlActions" style="display:none;">
+      <button class="btn btn-outline" id="btnShareFile">&#x1F4E4; 分享到其他应用</button>
+      <button class="btn btn-outline" id="btnOpenFile">&#x1F4C2; 用其他应用打开</button>
+    </div>
     <button class="btn btn-primary" id="btnDownloadClose">知道了</button>
   </div>
 </div>
@@ -1031,7 +1041,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
     <h3>关于 文简书斋</h3>
     <p class="about-desc">电子书处理工具 &middot; 简繁转换 / 文本净化 / 自定义去除 / 查找替换 / 批量处理</p>
     <div class="about-row"><span>作者</span><strong>Arisemoss</strong></div>
-    <div class="about-row"><span>版本</span><strong>v1.0</strong></div>
+    <div class="about-row"><span>版本</span><strong>v1.0.1</strong></div>
     <div class="about-row"><span>开源地址</span><strong class="about-link" id="aboutRepo">https://github.com/Arisemoss/jianfan-converter</strong></div>
     <p class="about-note">所有处理（读取、转换、统计、下载）均在本地完成，文件不会上传至任何服务器。</p>
     <div style="display:flex;gap:8px;justify-content:center;">
@@ -1135,6 +1145,12 @@ var downloadOverlay = $('downloadOverlay');
 var dlFileName = $('dlFileName');
 var dlHint = $('dlHint');
 var dlTips = $('dlTips');
+var dlActions = $('dlActions');
+var btnShareFile = $('btnShareFile');
+var btnOpenFile = $('btnOpenFile');
+// Android 原生保存后的文件 URI（供「分享 / 用其他应用打开」复用，避免重复保存）
+var lastSavedUri = '';
+var lastSavedMime = 'text/plain';
 
 // ========================
 //  CORE PURE FUNCTIONS (testable)
@@ -1875,12 +1891,26 @@ async function downloadFile(data, filename, mime) {
   }
 
   // Android App 原生保存（WebView 壳提供，文件名完全可控，避免 blob UUID 随机名）
-  if (typeof data === 'string' && window.AndroidBridge && window.AndroidBridge.saveText) {
+  if (window.AndroidBridge && window.AndroidBridge.saveText) {
     try {
-      var savedPath = window.AndroidBridge.saveText(data, filename);
-      if (savedPath) {
+      var savedUri = '';
+      if (typeof data === 'string') {
+        savedUri = window.AndroidBridge.saveText(data, filename);
+      } else if (data instanceof Blob && window.AndroidBridge.saveBase64) {
+        // 批量打包（zip 等二进制）→ base64 交给原生保存
+        var b64 = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = function () { reject(reader.error); };
+          reader.readAsDataURL(data);
+        });
+        savedUri = window.AndroidBridge.saveBase64(b64, filename, mime);
+      }
+      if (savedUri) {
+        lastSavedUri = savedUri;
+        lastSavedMime = mime;
         showToast('已保存到系统下载目录：' + filename, 'success');
-        showDownloadGuide(filename);
+        showDownloadGuide(filename, true);
         return;
       }
     } catch (e) {
@@ -1954,7 +1984,7 @@ var PLATFORM_TIPS = {
   }
 };
 
-function showDownloadGuide(filename) {
+function showDownloadGuide(filename, nativeSaved) {
   var info = PLATFORM_TIPS[detectPlatform()] || PLATFORM_TIPS.desktop;
   dlFileName.textContent = filename;
   dlHint.textContent = info.hint;
@@ -1964,6 +1994,21 @@ function showDownloadGuide(filename) {
     li.textContent = tip;
     dlTips.appendChild(li);
   });
+  // Android 原生保存后：提供「分享到其他应用」「用其他应用打开」低门槛选项
+  var canAct = nativeSaved && window.AndroidBridge && lastSavedUri;
+  dlActions.style.display = canAct ? 'flex' : 'none';
+  if (canAct) {
+    btnShareFile.onclick = function () {
+      if (window.AndroidBridge.shareFile) {
+        window.AndroidBridge.shareFile(lastSavedUri, filename, lastSavedMime);
+      }
+    };
+    btnOpenFile.onclick = function () {
+      if (window.AndroidBridge.openFile) {
+        window.AndroidBridge.openFile(lastSavedUri, filename, lastSavedMime);
+      }
+    };
+  }
   downloadOverlay.classList.add('active');
 }
 
