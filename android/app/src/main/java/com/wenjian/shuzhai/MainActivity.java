@@ -3,6 +3,7 @@ package com.wenjian.shuzhai;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -59,11 +60,9 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
-        // 关闭 WebView 自动算法暗色：页面明暗由 data-theme 完全控制，
-        // 避免系统深色模式下页面被算法再变暗一次（双重变暗、颜色失真）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            s.setForceDarkAllowed(false);
-        }
+        // 关闭 WebView 自动算法暗色（API 33+ 公开 API）：页面明暗由 data-theme 完全控制，
+        // 避免系统深色模式下页面被算法再变暗一次（双重变暗、颜色失真）。
+        // 注意：WebSettings.setForceDarkAllowed 是 @SystemApi 隐藏 API，应用层不能调用。
         if (Build.VERSION.SDK_INT >= 33) {
             s.setAlgorithmicDarkeningAllowed(false);
         }
@@ -157,6 +156,27 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    /**
+     * 系统深浅色切换（需 manifest 中 configChanges 包含 uiMode）。
+     * WebView 的 prefers-color-scheme 在 targetSdk≥33 时固定跟随 app 主题
+     * （isLightTheme），不会随系统变化，所以由原生侧检测并通知 JS 重新应用主题。
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 通知 JS：若当前处于「跟随系统」模式则重应用主题（并同步导航栏）；
+        // 手动模式不重应用，导航栏颜色由用户选择决定，不会被覆盖。
+        if (webView != null) {
+            webView.evaluateJavascript(
+                    "window.__systemThemeChanged && window.__systemThemeChanged();", null);
+        }
+    }
+
+    private boolean isSystemDark() {
+        return (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
     /**
@@ -302,6 +322,17 @@ public class MainActivity extends Activity {
                     applyThemeBars(dark);
                 }
             });
+        }
+
+        /**
+         * 系统当前是否深色模式。WebView 的 prefers-color-scheme 在 targetSdk≥33 时
+         * 固定跟随 app 主题（isLightTheme）而非系统，因此由原生侧读取系统配置
+         * 桥接给 JS，供「跟随系统」模式使用。
+         */
+        @JavascriptInterface
+        public boolean isSystemDark() {
+            return (getResources().getConfiguration().uiMode
+                    & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         }
     }
 

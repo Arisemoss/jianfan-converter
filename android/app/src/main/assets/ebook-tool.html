@@ -1443,6 +1443,11 @@ function saveSettings() {
 }
 
 function systemPrefersDark() {
+  // Android App（targetSdk>=33）：WebView 的 prefers-color-scheme 固定跟随 app 主题
+  // 而非系统，必须优先用原生 bridge 读取真实系统主题；浏览器环境回退到 matchMedia。
+  if (window.AndroidBridge && typeof window.AndroidBridge.isSystemDark === 'function') {
+    try { return !!window.AndroidBridge.isSystemDark(); } catch (e) { /* 忽略，走 matchMedia */ }
+  }
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 
@@ -1462,6 +1467,13 @@ function applyTheme(mode) {
 
 // 系统深浅色变化时，若当前处于「跟随系统」模式则自动切换
 function watchSystemTheme() {
+  // Android App：原生侧在 onConfigurationChanged 里调用（WebView 的
+  // prefers-color-scheme 不随系统变化，需原生通知）
+  window.__systemThemeChanged = function () {
+    if ((document.documentElement.dataset.themeMode || 'auto') === 'auto') {
+      applyTheme('auto');
+    }
+  };
   if (!window.matchMedia) return;
   var mq = window.matchMedia('(prefers-color-scheme: dark)');
   var onChange = function () {
