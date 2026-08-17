@@ -273,8 +273,8 @@ body {
 .tool-card-header h3 { font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 600; flex: 1; }
 .tool-card-header .toggle-indicator { color: var(--warm-gray); font-size: 12px; transition: transform 0.3s; }
 .tool-card-header .toggle-indicator.collapsed { transform: rotate(-90deg); }
-.tool-card-body { padding: 16px 20px 20px; transition: var(--transition); display: grid; grid-template-rows: 1fr; overflow: hidden; }
-.tool-card-body.hidden { grid-template-rows: 0fr; opacity: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
+.tool-card-body { padding: 16px 20px 20px; transition: var(--transition); }
+.tool-card-body.hidden { display: none; }
 
 /* ===== OPTIONS ===== */
 .option-group { margin-bottom: 14px; }
