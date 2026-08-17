@@ -273,8 +273,8 @@ body {
 .tool-card-header h3 { font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 600; flex: 1; }
 .tool-card-header .toggle-indicator { color: var(--warm-gray); font-size: 12px; transition: transform 0.3s; }
 .tool-card-header .toggle-indicator.collapsed { transform: rotate(-90deg); }
-.tool-card-body { padding: 16px 20px 20px; transition: var(--transition); }
-.tool-card-body.hidden { display: none; }
+.tool-card-body { padding: 16px 20px 20px; transition: var(--transition); display: grid; grid-template-rows: 1fr; overflow: hidden; }
+.tool-card-body.hidden { grid-template-rows: 0fr; opacity: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
 
 /* ===== OPTIONS ===== */
 .option-group { margin-bottom: 14px; }
@@ -732,6 +732,164 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   .preview-pane { max-height: 60vh; }
   .toast-container { left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
+
+/* ============================================================
+   UI & ANIMATION OPTIMIZATIONS
+   ============================================================ */
+
+/* --- 1. STAGGERED ENTRANCE ANIMATIONS --- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInFromLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes countPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes toastIn {
+  0% { transform: translateX(120%) scale(0.9); opacity: 0; }
+  50% { transform: translateX(-6%) scale(1.02); }
+  70% { transform: translateX(2%) scale(0.99); }
+  100% { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes toastOut {
+  0% { transform: translateX(0) scale(1); opacity: 1; }
+  100% { transform: translateX(120%) scale(0.9); opacity: 0; }
+}
+@keyframes dragPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(194, 59, 34, 0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(194, 59, 34, 0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Header entrance */
+.header { animation: slideInFromLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Upload zone entrance */
+.upload-zone { animation: fadeInScale 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+
+/* Stats staggered */
+.stat-card { animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.stat-card:nth-child(1) { animation-delay: 0.15s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.25s; }
+.stat-card:nth-child(4) { animation-delay: 0.3s; }
+.stat-card:nth-child(5) { animation-delay: 0.35s; }
+.stat-card:nth-child(6) { animation-delay: 0.4s; }
+
+/* Tool cards staggered */
+.tool-card { animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tool-card:nth-child(1) { animation-delay: 0.2s; }
+.tool-card:nth-child(2) { animation-delay: 0.28s; }
+.tool-card:nth-child(3) { animation-delay: 0.36s; }
+.tool-card:nth-child(4) { animation-delay: 0.44s; }
+.tool-card:nth-child(5) { animation-delay: 0.52s; }
+.tool-card:nth-child(6) { animation-delay: 0.6s; }
+
+/* Action bar & preview */
+.action-bar { animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both; }
+.preview-section { animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both; }
+.footer { animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.7s both; }
+
+/* --- 2. BUTTON RIPPLE --- */
+.btn { position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+.btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.35) 0%, transparent 70%);
+  opacity: 0; transform: scale(0);
+  transition: transform 0.5s ease, opacity 0.4s ease;
+  pointer-events: none;
+}
+.btn:active::after { transform: scale(2.5); opacity: 1; transition: transform 0s, opacity 0s; }
+
+/* --- 3. TOAST SPRING --- */
+.toast { animation: toastIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; transition: none; }
+.toast.removing { animation: toastOut 0.3s cubic-bezier(0.55, 0, 1, 0.45) both; }
+
+/* --- 4. DRAG PULSE --- */
+.upload-zone.dragover { animation: dragPulse 1.2s ease infinite; }
+
+/* --- 5. SPINNER ENHANCED --- */
+.spinner { border-top-color: var(--vermillion); border-right-color: var(--gold); position: relative; }
+.spinner::after {
+  content: ''; position: absolute; inset: -6px;
+  border: 2px solid transparent; border-top-color: rgba(201, 169, 110, 0.3);
+  border-radius: 50%; animation: spin 1.5s linear infinite reverse;
+}
+.processing-card { animation: fadeInScale 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* --- 6. PREVIEW CROSSFADE --- */
+.preview-pane { transition: opacity 0.3s ease, background-color 0.4s ease; }
+.preview-pane.fade-out { opacity: 0; }
+
+/* --- 7. TOGGLE ENHANCED --- */
+.toggle-slider { transition: background-color 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
+.toggle input:checked + .toggle-slider { box-shadow: 0 0 8px rgba(194, 59, 34, 0.3); }
+.toggle-slider::before { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* --- 8. PROGRESS BAR SHINE --- */
+.progress-bar { position: relative; overflow: hidden; }
+.progress-bar::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+  background-size: 200% 100%; animation: shimmer 1.5s ease infinite;
+}
+
+/* --- 9. CHECKBOX CHIP --- */
+.checkbox-item { transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.checkbox-item:active { transform: scale(0.95); }
+.checkbox-item.active { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* --- 10. FOCUS GLOW --- */
+.styled-select:focus { box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.2), 0 2px 8px rgba(201, 169, 110, 0.1); }
+.custom-input:focus, .text-input:focus { box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15), 0 2px 8px rgba(201, 169, 110, 0.08); }
+
+/* --- 11. STAT COUNT PULSE --- */
+.stat-value.counting { animation: countPulse 0.3s ease; color: var(--vermillion); }
+
+/* --- 12. HEADER ICON HOVER --- */
+.header-icon { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease; }
+.header-icon:hover { transform: scale(1.08) rotate(-3deg); box-shadow: 0 4px 16px rgba(201,169,110,0.4); }
+
+/* --- 13. FILE REMOVE --- */
+.file-remove { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.file-remove:hover { transform: rotate(90deg) scale(1.1); }
+
+/* --- 14. BATCH ITEM --- */
+.batch-item { animation: fadeInUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* --- 15. OVERLAY BACKDROP --- */
+.processing-overlay.active, .download-overlay.active { animation: fadeIn 0.25s ease both; }
+.download-card, .about-card { animation: fadeInScale 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* --- 16. SCROLLBAR --- */
+.preview-pane { scroll-behavior: smooth; }
+
+/* --- 17. REDUCED MOTION --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -1619,8 +1777,22 @@ document.querySelectorAll('.preview-tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
     document.querySelectorAll('.preview-tab').forEach(function (t) { t.classList.remove('active'); });
     tab.classList.add('active');
-    document.querySelectorAll('.preview-pane').forEach(function (p) { p.classList.add('hidden'); });
-    $(tab.dataset.pane).classList.remove('hidden');
+    var currentPane = null;
+    document.querySelectorAll('.preview-pane').forEach(function (p) {
+      if (!p.classList.contains('hidden')) { currentPane = p; }
+    });
+    if (currentPane) { currentPane.classList.add('fade-out'); }
+    setTimeout(function() {
+      document.querySelectorAll('.preview-pane').forEach(function (p) { p.classList.add('hidden'); p.classList.remove('fade-out'); });
+      var target = $(tab.dataset.pane);
+      if (target) {
+        target.classList.remove('hidden');
+        target.classList.add('fade-out');
+        requestAnimationFrame(function() {
+          target.classList.remove('fade-out');
+        });
+      }
+    }, 200);
   });
 });
 
@@ -2388,6 +2560,94 @@ $('btnReplaceAll').addEventListener('click', findReplaceAll);
 $('btnBatchSelect').addEventListener('click', function () { batchFileInput.click(); });
 
 console.log('📖 文简书斋 loaded — 所有处理在浏览器本地完成');
+
+// ============================================================
+// UI & ANIMATION JS OPTIMIZATIONS
+// ============================================================
+
+// --- 1. STAT NUMBER COUNT-UP ANIMATION ---
+(function() {
+  var origUpdateStats = window.updateStats;
+  if (typeof origUpdateStats !== 'function') return;
+  var activeAnimations = {};
+
+  function animateNumber(el, target, duration) {
+    duration = duration || 600;
+    if (!el) return;
+    var id = el.id;
+    if (activeAnimations[id]) cancelAnimationFrame(activeAnimations[id]);
+    var start = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10) || 0;
+    if (start === target) return;
+    var startTime = null;
+    el.classList.add('counting');
+
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      var progress = Math.min((ts - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      var current = Math.round(start + (target - start) * eased);
+      el.textContent = current.toLocaleString();
+      if (progress < 1) {
+        activeAnimations[id] = requestAnimationFrame(step);
+      } else {
+        el.textContent = target.toLocaleString();
+        el.classList.remove('counting');
+        delete activeAnimations[id];
+      }
+    }
+    activeAnimations[id] = requestAnimationFrame(step);
+  }
+
+  window.updateStats = function(text) {
+    if (!text) {
+      var statsBar = document.getElementById('statsBar');
+      if (statsBar) statsBar.style.display = 'none';
+      return;
+    }
+    var statsBar = document.getElementById('statsBar');
+    if (statsBar) statsBar.style.display = 'grid';
+    var st = countStats(text);
+    animateNumber(document.getElementById('statTotalChars'), st.totalChars, 600);
+    animateNumber(document.getElementById('statTotalLines'), st.lines, 500);
+    animateNumber(document.getElementById('statParagraphs'), st.paragraphs, 500);
+    animateNumber(document.getElementById('statChineseChars'), st.chineseChars, 600);
+    animateNumber(document.getElementById('statTraditionalChars'), st.tradChars, 600);
+    animateNumber(document.getElementById('statOtherChars'), st.otherChars, 500);
+  };
+})();
+
+// --- 2. TOAST IMPROVED EXIT ---
+(function() {
+  var origShowToast = window.showToast;
+  if (typeof origShowToast !== 'function') return;
+
+  window.showToast = function(msg, type) {
+    type = type || 'success';
+    var toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = msg;
+    var container = document.getElementById('toastContainer');
+    container.appendChild(toast);
+    setTimeout(function() {
+      toast.classList.add('removing');
+      setTimeout(function() { toast.remove(); }, 350);
+    }, 2600);
+  };
+})();
+
+// --- 3. RIPPLE POSITION TRACKING ---
+document.addEventListener('mousedown', function(e) {
+  var btn = e.target.closest('.btn');
+  if (!btn || btn.disabled) return;
+  var rect = btn.getBoundingClientRect();
+  var x = ((e.clientX - rect.left) / rect.width * 100) + '%';
+  var y = ((e.clientY - rect.top) / rect.height * 100) + '%';
+  btn.style.setProperty('--ripple-x', x);
+  btn.style.setProperty('--ripple-y', y);
+});
+
+
+
 </script>
 </body>
 </html>
