@@ -86,14 +86,23 @@ public class MainActivity extends Activity {
                     Intent intent = params.createIntent();
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NO_HISTORY);
                     startActivityForResult(intent, FILE_CHOOSER_REQUEST);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    if (filePathCallback != null) {
-                        filePathCallback.onReceiveValue(null);
-                        filePathCallback = null;
+                } catch (Exception e1) {
+                    // 某些设备上 params.createIntent() 可能失败，用通用文件选择器兜底
+                    try {
+                        Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                        fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                        fallback.setType("*/*");
+                        fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
+                        startActivityForResult(Intent.createChooser(fallback, "选择文件"), FILE_CHOOSER_REQUEST);
+                    } catch (Exception e2) {
+                        e2.printStackTrace();
+                        if (filePathCallback != null) {
+                            filePathCallback.onReceiveValue(null);
+                            filePathCallback = null;
+                        }
+                        toast("无法打开文件选择器，请检查文件管理器权限");
+                        return false;
                     }
-                    toast("无法打开文件选择器，请检查文件管理器权限");
-                    return false;
                 }
                 return true;
             }
@@ -194,9 +203,10 @@ public class MainActivity extends Activity {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         boolean dark = isSystemDark();
-        // 同步导航栏
+        // 同步导航栏颜色（跟随当前主题）
         applyThemeBars(dark);
-        // 通知 JS：若当前处于「跟随系统」模式则重应用主题
+        // 通知 JS：若当前处于「跟随系统」模式则重应用主题。
+        // 注意：evaluateJavascript 是异步的，先同步原生 UI 再通知 JS。
         if (webView != null) {
             webView.evaluateJavascript(
                     "(function(){ " +
