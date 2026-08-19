@@ -1,0 +1,17 @@
+{
+  "name": "文简书斋 · 电子书处理工具",
+  "short_name": "文简书斋",
+  "description": "纯前端简繁转换电子书处理工具，支持离线使用",
+  "start_url": "./ebook-tool.html",
+  "display": "standalone",
+  "background_color": "#f5f0e6",
+  "theme_color": "#1a1a1a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
