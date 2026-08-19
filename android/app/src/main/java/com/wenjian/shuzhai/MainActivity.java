@@ -149,6 +149,7 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
+    @SuppressWarnings("deprecation") // onBackPressed 在 API 33 废弃，但项目使用基础 Activity（非 AndroidX），保留兼容
     @Override
     public void onBackPressed() {
         if (webView.canGoBack()) {

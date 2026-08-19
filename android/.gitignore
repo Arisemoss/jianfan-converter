@@ -1,0 +1,10 @@
+# Signing keys — NEVER commit
+keystore/
+*.keystore
+*.jks
+*.key
+
+# Build outputs
+build/
+app/build/
+local.properties

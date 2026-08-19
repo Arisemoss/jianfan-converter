@@ -870,6 +870,22 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 /* --- 16. SCROLLBAR --- */
 .preview-pane { scroll-behavior: smooth; }
 
+
+/* --- 17. REDUCED MOTION --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .header { animation: none; }
+  .upload-zone { animation: none; }
+  .stat-card, .tool-card, .action-bar, .preview-section, .footer { animation: none; }
+  .toast { animation: none; opacity: 1; }
+  .toast.removing { animation: none; opacity: 0; transition: opacity 0.2s; }
+  .preview-pane { scroll-behavior: auto; }
+}
+
 </style>
 </head>
 <body>
@@ -1740,14 +1756,42 @@ function updateFileUI() {
 // ========================
 function updateStats(text) {
   if (!text) { statsBar.style.display = 'none'; return; }
+
+// 数字计数动画（辅助函数）
+var _activeStatAnimations = {};
+function animateStatNumber(el, target, duration) {
+  duration = duration || 600;
+  if (!el) return;
+  var id = el.id;
+  if (_activeStatAnimations[id]) cancelAnimationFrame(_activeStatAnimations[id]);
+  var start = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10) || 0;
+  if (start === target) { el.textContent = target.toLocaleString(); return; }
+  var startTime = null;
+  el.classList.add('counting');
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    var progress = Math.min((ts - startTime) / duration, 1);
+    var eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(start + (target - start) * eased).toLocaleString();
+    if (progress < 1) {
+      _activeStatAnimations[id] = requestAnimationFrame(step);
+    } else {
+      el.textContent = target.toLocaleString();
+      el.classList.remove('counting');
+      delete _activeStatAnimations[id];
+    }
+  }
+  _activeStatAnimations[id] = requestAnimationFrame(step);
+}
+
   statsBar.style.display = 'grid';
   var st = countStats(text);
-  statTotalChars.textContent = st.totalChars.toLocaleString();
-  statTotalLines.textContent = st.lines.toLocaleString();
-  statParagraphs.textContent = st.paragraphs.toLocaleString();
-  statChineseChars.textContent = st.chineseChars.toLocaleString();
-  statTraditionalChars.textContent = st.tradChars.toLocaleString();
-  statOtherChars.textContent = st.otherChars.toLocaleString();
+  animateStatNumber(statTotalChars, st.totalChars, 600);
+  animateStatNumber(statTotalLines, st.lines, 500);
+  animateStatNumber(statParagraphs, st.paragraphs, 500);
+  animateStatNumber(statChineseChars, st.chineseChars, 600);
+  animateStatNumber(statTraditionalChars, st.tradChars, 600);
+  animateStatNumber(statOtherChars, st.otherChars, 500);
 }
 
 // ========================
@@ -1877,7 +1921,13 @@ function updateUndoRedo() {
 // ========================
 //  PROCESSING PIPELINE
 // ========================
-var CHUNK_LINES = 4000;
+// 动态分块：小文件不拆分，大文件按设备性能自适应
+function getChunkLines(totalLines) {
+  if (totalLines <= 4000) return totalLines;
+  var mem = navigator.deviceMemory || 4;
+  var base = mem <= 2 ? 2000 : 4000;
+  return Math.min(base, Math.ceil(totalLines / 4));
+}
 
 function showOverlay(text, withProgress) {
   processingText.textContent = text;
@@ -1899,14 +1949,15 @@ function hideOverlay() {
 async function processChunks(text, chunkFn, onProgress) {
   var lines = text.split('\n');
   var total = lines.length;
-  if (total <= CHUNK_LINES) {
+  var chunkSize = getChunkLines(total);
+  if (total <= chunkSize) {
     return chunkFn(text);
   }
   var out = [];
-  for (var i = 0; i < total; i += CHUNK_LINES) {
-    var chunk = lines.slice(i, i + CHUNK_LINES).join('\n');
+  for (var i = 0; i < total; i += chunkSize) {
+    var chunk = lines.slice(i, i + chunkSize).join('\n');
     out.push(chunkFn(chunk));
-    if (onProgress) onProgress((i + CHUNK_LINES) / total);
+    if (onProgress) onProgress((i + chunkSize) / total);
     await new Promise(function (r) { setTimeout(r, 0); });
   }
   return out.join('\n');
@@ -2466,8 +2517,7 @@ function showToast(msg, type) {
   toast.textContent = msg;
   toastContainer.appendChild(toast);
   setTimeout(function () {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(100%)';
+    toast.classList.add('removing');
     setTimeout(function () { toast.remove(); }, 350);
   }, 2600);
 }
@@ -2537,87 +2587,7 @@ $('customRemovePatterns').addEventListener('input', saveSettings);
 $('findRegex').addEventListener('change', function () { $('findResult').textContent = '替换会作用于「处理后文本」，可撤销'; });
 $('btnFindCount').addEventListener('click', findCount);
 $('btnReplaceAll').addEventListener('click', findReplaceAll);
-$('btnBatchSelect').addEventListener('click', function () { batchFileInput.click(); });
-
 console.log('📖 文简书斋 loaded — 所有处理在浏览器本地完成');
-
-// ============================================================
-// UI & ANIMATION JS OPTIMIZATIONS
-// ============================================================
-
-// --- 1. STAT NUMBER COUNT-UP ANIMATION ---
-(function() {
-  var origUpdateStats = window.updateStats;
-  if (typeof origUpdateStats !== 'function') return;
-  var activeAnimations = {};
-
-  function animateNumber(el, target, duration) {
-    duration = duration || 600;
-    if (!el) return;
-    var id = el.id;
-    if (activeAnimations[id]) cancelAnimationFrame(activeAnimations[id]);
-    var start = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10) || 0;
-    if (start === target) return;
-    var startTime = null;
-    el.classList.add('counting');
-
-    function step(ts) {
-      if (!startTime) startTime = ts;
-      var progress = Math.min((ts - startTime) / duration, 1);
-      var eased = 1 - Math.pow(1 - progress, 3);
-      var current = Math.round(start + (target - start) * eased);
-      el.textContent = current.toLocaleString();
-      if (progress < 1) {
-        activeAnimations[id] = requestAnimationFrame(step);
-      } else {
-        el.textContent = target.toLocaleString();
-        el.classList.remove('counting');
-        delete activeAnimations[id];
-      }
-    }
-    activeAnimations[id] = requestAnimationFrame(step);
-  }
-
-  window.updateStats = function(text) {
-    if (!text) {
-      var statsBar = document.getElementById('statsBar');
-      if (statsBar) statsBar.style.display = 'none';
-      return;
-    }
-    var statsBar = document.getElementById('statsBar');
-    if (statsBar) statsBar.style.display = 'grid';
-    var st = countStats(text);
-    animateNumber(document.getElementById('statTotalChars'), st.totalChars, 600);
-    animateNumber(document.getElementById('statTotalLines'), st.lines, 500);
-    animateNumber(document.getElementById('statParagraphs'), st.paragraphs, 500);
-    animateNumber(document.getElementById('statChineseChars'), st.chineseChars, 600);
-    animateNumber(document.getElementById('statTraditionalChars'), st.tradChars, 600);
-    animateNumber(document.getElementById('statOtherChars'), st.otherChars, 500);
-  };
-})();
-
-// --- 2. TOAST IMPROVED EXIT ---
-(function() {
-  var origShowToast = window.showToast;
-  if (typeof origShowToast !== 'function') return;
-
-  window.showToast = function(msg, type) {
-    type = type || 'success';
-    var toast = document.createElement('div');
-    toast.className = 'toast ' + type;
-    toast.textContent = msg;
-    var container = document.getElementById('toastContainer');
-    container.appendChild(toast);
-    setTimeout(function() {
-      toast.classList.add('removing');
-      setTimeout(function() { toast.remove(); }, 350);
-    }, 2600);
-  };
-})();
-
-
-
-
 
 </script>
 </body>
