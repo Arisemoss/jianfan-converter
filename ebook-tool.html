@@ -940,11 +940,31 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
         <button class="file-remove" id="fileRemoveBtn" title="移除文件">&#x2715;</button>
       </div>
     </div>
-    <input type="file" class="upload-input" id="fileInput" accept=".txt,.html,.htm,.md,.csv,.json,.xml">
+    <input type="file" class="upload-input" id="fileInput" accept=".txt,.html,.htm,.md,.csv,.json,.xml,.log,.yaml,.yml,.toml,.ini,.conf,.cfg,.srt,.vtt,.epub,.rtf">
   </div>
 
   <!-- Stats -->
-  <div class="stats-grid" id="statsBar" style="display:none;">
+  
+    <!-- 编码选择 -->
+    <div id="encodingBar" style="display:none;margin-top:12px;padding:10px 16px;background:var(--paper-light);border:1px solid var(--border);border-radius:var(--radius-sm);align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:13px;font-weight:500;color:var(--ink-light);">📖 编码</span>
+      <select class="styled-select" id="encodingSelect" style="width:auto;min-width:160px;">
+        <option value="auto">自动检测</option>
+        <option value="UTF-8">UTF-8</option>
+        <option value="GB18030">GB18030 (简中)</option>
+        <option value="GBK">GBK (简中)</option>
+        <option value="BIG5">Big5 (繁中)</option>
+        <option value="SHIFT_JIS">Shift_JIS (日文)</option>
+        <option value="EUC-JP">EUC-JP (日文)</option>
+        <option value="EUC-KR">EUC-KR (韩文)</option>
+        <option value="WINDOWS-1252">Windows-1252 (西欧)</option>
+        <option value="ISO-8859-1">ISO-8859-1 (西欧)</option>
+        <option value="UTF-16LE">UTF-16 LE</option>
+        <option value="UTF-16BE">UTF-16 BE</option>
+      </select>
+      <span id="encodingStatus" style="font-size:12px;color:var(--warm-gray);"></span>
+    </div>
+    <div class="stats-grid" id="statsBar" style="display:none;">
     <div class="stat-card"><div class="stat-label">&#x1F4CB; 总字数</div><div class="stat-value" id="statTotalChars">0</div></div>
     <div class="stat-card"><div class="stat-label">&#x1F4C4; 总行数</div><div class="stat-value" id="statTotalLines">0</div></div>
     <div class="stat-card"><div class="stat-label">&#x1F4D0; 段落数</div><div class="stat-value" id="statParagraphs">0</div></div>
@@ -1123,7 +1143,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
             <button class="btn btn-outline" id="btnBatchSelect">&#x1F4C2; 选择多个文件</button>
             <button class="btn btn-primary" id="btnBatchProcess" disabled>&#x1F4E6; 全部处理并打包下载</button>
             <button class="btn btn-outline btn-sm" id="btnBatchClear" disabled>&#x2715; 清空列表</button>
-            <input type="file" class="upload-input" id="batchFileInput" multiple accept=".txt,.html,.htm,.md,.csv,.json,.xml">
+            <input type="file" class="upload-input" id="batchFileInput" multiple accept=".txt,.html,.htm,.md,.csv,.json,.xml,.log,.yaml,.yml,.toml,.ini,.conf,.cfg,.srt,.vtt,.epub,.rtf">
           </div>
         </div>
         <div class="batch-list" id="batchFileList"></div>
@@ -1270,6 +1290,175 @@ function ensureJSZip() {
   if (jszipPromise) return jszipPromise;
   jszipPromise = loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 8000);
   return jszipPromise;
+}
+
+
+// ========================
+//  ENCODING DETECTION & READER
+// ========================
+var SUPPORTED_ENCODINGS = [
+  'UTF-8', 'UTF-16LE', 'UTF-16BE',
+  'GB18030', 'GBK', 'GB2312',
+  'BIG5', 'SHIFT_JIS', 'EUC-JP', 'EUC-KR',
+  'ISO-8859-1', 'WINDOWS-1252', 'WINDOWS-1251',
+  'ISO-8859-2', 'ISO-8859-15', 'KOI8-R', 'KOI8-U'
+];
+
+// 检测 BOM (Byte Order Mark)
+function detectBOM(uint8) {
+  if (uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) return 'UTF-8';
+  if (uint8[0] === 0xFF && uint8[1] === 0xFE) return 'UTF-16LE';
+  if (uint8[0] === 0xFE && uint8[1] === 0xFF) return 'UTF-16BE';
+  return null;
+}
+
+// 检测中文编码特征
+function detectChineseEncoding(uint8) {
+  var sample = uint8.slice(0, 4096);
+  var gbkScore = 0, big5Score = 0;
+  for (var i = 0; i < sample.length - 1; i++) {
+    var b1 = sample[i], b2 = sample[i + 1];
+    // GBK: 双字节范围 0x81-0xFE x 0x40-0xFE
+    if (b1 >= 0x81 && b1 <= 0xFE && b2 >= 0x40 && b2 <= 0xFE) gbkScore++;
+    // BIG5: 双字节范围 0x81-0xFE x 0x40-0x7E 或 0xA1-0xFE
+    if (b1 >= 0x81 && b1 <= 0xFE && ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0xA1 && b2 <= 0xFE))) big5Score++;
+  }
+  if (gbkScore > big5Score * 1.5 && gbkScore > 10) return 'GB18030';
+  if (big5Score > gbkScore * 1.5 && big5Score > 10) return 'BIG5';
+  return null;
+}
+
+// 检测日文编码
+function detectJapaneseEncoding(uint8) {
+  var sample = uint8.slice(0, 4096);
+  var sjisScore = 0, eucjpScore = 0;
+  for (var i = 0; i < sample.length - 1; i++) {
+    var b1 = sample[i], b2 = sample[i + 1];
+    // Shift_JIS
+    if ((b1 >= 0x81 && b1 <= 0x9F) || (b1 >= 0xE0 && b1 <= 0xEF)) {
+      if (b2 >= 0x40 && b2 <= 0xFC) sjisScore++;
+    }
+    // EUC-JP
+    if (b1 >= 0xA1 && b1 <= 0xFE && b2 >= 0xA1 && b2 <= 0xFE) eucjpScore++;
+  }
+  if (sjisScore > eucjpScore * 1.5 && sjisScore > 5) return 'SHIFT_JIS';
+  if (eucjpScore > sjisScore * 1.5 && eucjpScore > 5) return 'EUC-JP';
+  return null;
+}
+
+// 自动检测编码
+function detectEncoding(uint8) {
+  var bom = detectBOM(uint8);
+  if (bom) return bom;
+  var cn = detectChineseEncoding(uint8);
+  if (cn) return cn;
+  var jp = detectJapaneseEncoding(uint8);
+  if (jp) return jp;
+  // 默认 UTF-8
+  return 'UTF-8';
+}
+
+// 尝试用指定编码解码，返回 { text, encoding, confidence }
+function tryDecode(uint8, encoding) {
+  try {
+    var decoder = new TextDecoder(encoding, { fatal: true });
+    var text = decoder.decode(uint8);
+    // 检查替换字符比例判断解码质量
+    var replacementCount = (text.match(/\uFFFD/g) || []).length;
+    var confidence = replacementCount === 0 ? 1.0 : Math.max(0, 1 - replacementCount / text.length);
+    return { text: text, encoding: encoding, confidence: confidence };
+  } catch (e) {
+    return { text: '', encoding: encoding, confidence: 0 };
+  }
+}
+
+// 智能解码：BOM → 自动检测 → UTF-8 → 回退链
+function smartDecode(uint8) {
+  // 1. BOM 检测
+  var bom = detectBOM(uint8);
+  if (bom) {
+    var r = tryDecode(uint8, bom);
+    if (r.confidence > 0.9) return r;
+  }
+
+  // 2. 自动检测
+  var detected = detectEncoding(uint8);
+  if (detected !== 'UTF-8') {
+    var r = tryDecode(uint8, detected);
+    if (r.confidence > 0.9) return r;
+  }
+
+  // 3. UTF-8 尝试
+  var utf8 = tryDecode(uint8, 'UTF-8');
+  if (utf8.confidence > 0.95) return utf8;
+
+  // 4. 回退链
+  var fallbacks = ['GB18030', 'BIG5', 'SHIFT_JIS', 'EUC-JP', 'EUC-KR', 'WINDOWS-1252'];
+  var best = utf8;
+  for (var i = 0; i < fallbacks.length; i++) {
+    var r = tryDecode(uint8, fallbacks[i]);
+    if (r.confidence > best.confidence) best = r;
+    if (best.confidence > 0.95) break;
+  }
+  return best;
+}
+
+// 读取文件为 ArrayBuffer，然后智能解码
+function readFileWithEncoding(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var uint8 = new Uint8Array(e.target.result);
+      var result = smartDecode(uint8);
+      resolve(result);
+    };
+    reader.onerror = function () { reject(new Error('文件读取失败')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// EPUB 提取纯文本（需 JSZip）
+function extractEpubText(uint8) {
+  return ensureJSZip().then(function (ok) {
+    if (!ok) return null;
+    return JSZip.loadAsync(uint8).then(function (zip) {
+      // 找到 OPF 文件
+      var opfPath = null;
+      var containerFile = zip.file('META-INF/container.xml');
+      if (!containerFile) return null;
+      return containerFile.async('text').then(function (xml) {
+        var match = xml.match(/full-path="([^"]+)"/);
+        if (match) opfPath = match[1];
+        if (!opfPath) return null;
+        // 读取 OPF 找到 spine 顺序
+        return zip.file(opfPath).async('text').then(function (opf) {
+          var items = [];
+          var itemRe = /<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"/g;
+          var m;
+          while ((m = itemRe.exec(opf)) !== null) items.push({ id: m[1], href: m[2] });
+          var spineRe = /<itemref[^>]+idref="([^"]+)"/g;
+          var spine = [];
+          while ((m = spineRe.exec(opf)) !== null) spine.push(m[1]);
+          var opfDir = opfPath.replace(/\/[^\/]+$/, '/');
+          // 按 spine 顺序读取 XHTML
+          var promises = spine.map(function (id) {
+            var item = items.find(function (i) { return i.id === id; });
+            if (!item) return Promise.resolve('');
+            var fullPath = opfDir + item.href;
+            var f = zip.file(fullPath);
+            if (!f) return Promise.resolve('');
+            return f.async('text').then(function (html) {
+              // 简单去 HTML 标签
+              return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            });
+          });
+          return Promise.all(promises).then(function (parts) {
+            return parts.join('\n\n');
+          });
+        });
+      });
+    });
+  });
 }
 
 // ========================
@@ -1710,9 +1899,9 @@ fileRemoveBtn.addEventListener('click', function (e) {
 
 function handleFile(file) {
   var ext = file.name.split('.').pop().toLowerCase();
-  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
+  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml', 'log', 'yaml', 'yml', 'toml', 'ini', 'conf', 'cfg', 'srt', 'vtt', 'epub', 'rtf'];
   if (allowed.indexOf(ext) === -1) {
-    showToast('不支持的文件格式：.' + ext + '，请上传 TXT、HTML、MD 等文本文件', 'error');
+    showToast('不支持的文件格式：.' + ext, 'error');
     return;
   }
 
@@ -1726,31 +1915,74 @@ function handleFile(file) {
     showToast('文件较大（' + formatSize(file.size) + '），处理可能需要一些时间', 'info');
   }
 
-  var reader = new FileReader();
-  reader.onload = function (e) {
-    state.rawText = e.target.result;
+  // EPUB 特殊处理
+  if (ext === 'epub') {
+    showToast('正在解析 EPUB...', 'info');
+    readFileWithEncoding(file).then(function (result) {
+      return extractEpubText(new Uint8Array(result.text.length));
+    }).catch(function () {
+      // 回退：直接读取 ArrayBuffer
+      return new Promise(function (resolve) {
+        var r = new FileReader();
+        r.onload = function (e) { resolve(e.target.result); };
+        r.readAsArrayBuffer(file);
+      }).then(function (buf) {
+        return extractEpubText(new Uint8Array(buf));
+      });
+    }).then(function (text) {
+      if (!text) { showToast('EPUB 解析失败', 'error'); return; }
+      state.rawText = text;
+      state.processedText = '';
+      finishFileLoad(file.name);
+    }).catch(function (e) {
+      showToast('EPUB 解析失败：' + e.message, 'error');
+    });
+    return;
+  }
+
+  // 智能编码检测
+  _currentRawFile = file;
+  readFileWithEncoding(file).then(function (result) {
+    state.rawText = result.text;
     state.processedText = '';
-    // 无意义 hash 文件名：用内容首行作为标题重命名
-    if (looksLikeHash(state.fileName)) {
-      var title = extractTitle(state.rawText);
-      if (title) {
-        var oldExt = state.fileName.split('.').pop() || 'txt';
-        state.fileName = sanitizeFilename(title + '.' + oldExt);
-        showToast('文件名无意义，已按内容重命名为：' + state.fileName, 'info');
-      }
+    if (result.encoding !== 'UTF-8') {
+      showToast('编码检测：' + result.encoding + '（置信度 ' + Math.round(result.confidence * 100) + '%）', 'info');
     }
-    if ((state.rawText.match(/\uFFFD/g) || []).length > Math.max(10, state.rawText.length * 0.001)) {
-      showToast('检测到大量乱码字符，文件可能不是 UTF-8 编码（如 GBK），请先转换编码', 'error');
+    finishFileLoad(file.name);
+  }).catch(function (e) {
+    // 回退到 UTF-8
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      state.rawText = ev.target.result;
+      state.processedText = '';
+      finishFileLoad(file.name);
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+_currentRawFile = null; // will be set in handleFile
+function finishFileLoad(name) {
+  if (looksLikeHash(state.fileName)) {
+    var title = extractTitle(state.rawText);
+    if (title) {
+      var oldExt = state.fileName.split('.').pop() || 'txt';
+      state.fileName = sanitizeFilename(title + '.' + oldExt);
+      showToast('已按内容重命名为：' + state.fileName, 'info');
     }
-    updateFileUI();
-    updateStats(state.rawText);
-    showPreview('original', state.rawText);
-    clearResult();
-    btnProcessAll.disabled = false;
-    btnResetPreview.disabled = false;
-    showToast('文件加载成功：' + file.name, 'success');
-  };
-  reader.readAsText(file, 'UTF-8');
+  }
+  var badChars = (state.rawText.match(/\uFFFD/g) || []).length;
+  if (badChars > Math.max(10, state.rawText.length * 0.001)) {
+    showToast('检测到 ' + badChars + ' 个乱码字符，可尝试手动选择其他编码', 'error');
+  }
+  $('encodingBar').style.display = 'flex';
+  updateFileUI();
+  updateStats(state.rawText);
+  showPreview('original', state.rawText);
+  clearResult();
+  btnProcessAll.disabled = false;
+  btnResetPreview.disabled = false;
+  showToast('文件加载成功：' + name, 'success');
 }
 
 function formatSize(size) {
@@ -1768,6 +2000,8 @@ function removeFile() {
   state.redoStack = [];
   updateUndoRedo();
   uploadEmpty.style.display = '';
+  $('encodingBar').style.display = 'none';
+  $('encodingStatus').textContent = '';
   uploadFileInfo.style.display = 'none';
   uploadZone.classList.remove('has-file');
   statsBar.style.display = 'none';
@@ -2400,7 +2634,7 @@ var batchProgressText = $('batchProgressText');
 btnBatchSelect.addEventListener('click', function () { batchFileInput.click(); });
 
 batchFileInput.addEventListener('change', function () {
-  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml'];
+  var allowed = ['txt', 'html', 'htm', 'md', 'csv', 'json', 'xml', 'log', 'yaml', 'yml', 'toml', 'ini', 'conf', 'cfg', 'srt', 'vtt', 'epub', 'rtf'];
   Array.prototype.forEach.call(batchFileInput.files, function (file) {
     var ext = file.name.split('.').pop().toLowerCase();
     if (allowed.indexOf(ext) === -1) {
@@ -2471,7 +2705,7 @@ btnBatchProcess.addEventListener('click', async function () {
     renderBatchList();
     batchProgressText.textContent = '正在处理 (' + (i + 1) + '/' + total + ')：' + entry.file.name;
     try {
-      var text = await readFileText(entry.file);
+      var text = await readFileTextSmart(entry.file);
       var processed = await processChunks(text, function (chunk) {
         var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
         t = cleanText(t, cleanVals);
@@ -2536,6 +2770,11 @@ function readFileText(file) {
     reader.onerror = function () { reject(new Error('读取失败')); };
     reader.readAsText(file, 'UTF-8');
   });
+}
+
+// 带编码检测的读取（用于批量处理）
+function readFileTextSmart(file) {
+  return readFileWithEncoding(file).then(function (r) { return r.text; });
 }
 
 // ========================
@@ -2683,6 +2922,38 @@ $('btnCloseDiff').addEventListener('click', function() {
 // ========================
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+
+
+// 编码切换：重新读取当前文件
+var _currentRawFile = null;
+$('encodingSelect').addEventListener('change', function () {
+  if (!_currentRawFile) return;
+  var enc = this.value;
+  $('encodingStatus').textContent = '正在重新解码...';
+  if (enc === 'auto') {
+    readFileWithEncoding(_currentRawFile).then(function (r) {
+      state.rawText = r.text;
+      $('encodingStatus').textContent = '自动: ' + r.encoding;
+      refreshPreview();
+    });
+  } else {
+    _currentRawFile.arrayBuffer().then(function (buf) {
+      var r = tryDecode(new Uint8Array(buf), enc);
+      state.rawText = r.text;
+      $('encodingStatus').textContent = enc + (r.confidence < 0.9 ? ' (置信度偏低)' : '');
+      refreshPreview();
+    });
+  }
+});
+
+function refreshPreview() {
+  state.processedText = '';
+  showPreview('original', state.rawText);
+  updateStats(state.rawText);
+  clearResult();
+  btnProcessAll.disabled = false;
+  btnResetPreview.disabled = false;
 }
 
 console.log('📖 文简书斋 loaded — 所有处理在浏览器本地完成');
