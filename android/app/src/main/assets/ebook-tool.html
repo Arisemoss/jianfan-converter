@@ -946,7 +946,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   <!-- Stats -->
   
     <!-- 编码选择 -->
-    <div id="encodingBar" style="display:none;margin-top:12px;padding:10px 16px;background:var(--paper-light);border:1px solid var(--border);border-radius:var(--radius-sm);align-items:center;gap:12px;flex-wrap:wrap;">
+    <div id="encodingBar" style="display:none;margin-top:12px;padding:10px 16px;background:var(--paper-light);border:1px solid var(--border);border-radius:var(--radius-sm);gap:12px;flex-wrap:wrap;">
       <span style="font-size:13px;font-weight:500;color:var(--ink-light);">📖 编码</span>
       <select class="styled-select" id="encodingSelect" style="width:auto;min-width:160px;">
         <option value="auto">自动检测</option>
@@ -1915,20 +1915,15 @@ function handleFile(file) {
     showToast('文件较大（' + formatSize(file.size) + '），处理可能需要一些时间', 'info');
   }
 
-  // EPUB 特殊处理
+  // EPUB 特殊处理（二进制格式，直接读 ArrayBuffer）
   if (ext === 'epub') {
     showToast('正在解析 EPUB...', 'info');
-    readFileWithEncoding(file).then(function (result) {
-      return extractEpubText(new Uint8Array(result.text.length));
-    }).catch(function () {
-      // 回退：直接读取 ArrayBuffer
-      return new Promise(function (resolve) {
-        var r = new FileReader();
-        r.onload = function (e) { resolve(e.target.result); };
-        r.readAsArrayBuffer(file);
-      }).then(function (buf) {
-        return extractEpubText(new Uint8Array(buf));
-      });
+    new Promise(function (resolve) {
+      var r = new FileReader();
+      r.onload = function (e) { resolve(new Uint8Array(e.target.result)); };
+      r.readAsArrayBuffer(file);
+    }).then(function (buf) {
+      return extractEpubText(buf);
     }).then(function (text) {
       if (!text) { showToast('EPUB 解析失败', 'error'); return; }
       state.rawText = text;
@@ -1961,7 +1956,6 @@ function handleFile(file) {
   });
 }
 
-_currentRawFile = null; // will be set in handleFile
 function finishFileLoad(name) {
   if (looksLikeHash(state.fileName)) {
     var title = extractTitle(state.rawText);
