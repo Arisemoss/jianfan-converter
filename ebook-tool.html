@@ -2041,7 +2041,7 @@ async function processText() {
 
     // 阶段 1+2+3：简繁转换（可开关）+ 行级净化 + 去除（分块执行，避免大文件卡死 UI）
     result = await processChunks(result, function (chunk) {
-      var t = convEnabled ? convertText(chunk, convDirection) : chunk;
+      var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
       t = cleanText(t, cleanVals);
       t = removeText(t, removeVals, customPatterns, useRegex);
       return t;
@@ -2473,7 +2473,7 @@ btnBatchProcess.addEventListener('click', async function () {
     try {
       var text = await readFileText(entry.file);
       var processed = await processChunks(text, function (chunk) {
-        var t = convEnabled ? convertText(chunk, convDirection) : chunk;
+        var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
         t = cleanText(t, cleanVals);
         t = removeText(t, removeVals, customPatterns, useRegex);
         return t;
