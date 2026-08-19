@@ -142,6 +142,8 @@ body {
   align-items: center;
   justify-content: center;
   transition: var(--transition);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .theme-toggle:hover { background: rgba(201, 169, 110, 0.25); transform: rotate(15deg); }
 
@@ -159,6 +161,8 @@ body {
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .upload-zone::before {
   content: '';
@@ -1830,6 +1834,13 @@ function systemPrefersDark() {
   if (window.AndroidBridge && typeof window.AndroidBridge.isSystemDark === 'function') {
     try { return !!window.AndroidBridge.isSystemDark(); } catch (e) { /* 忽略，走 matchMedia */ }
   }
+  // WebView 内 matchMedia 的 prefers-color-scheme 在部分 Android 设备上不可靠
+  // （targetSdk>=33 时 prefers-color-scheme 被强制设为 app 主题而非系统主题）。
+  // 仅检测真正的 WebView（UA 含 "wv" 标记），不影响 Chrome/Edge 等浏览器（它们的 matchMedia 可靠）。
+  var ua = navigator.userAgent || '';
+  if (/\bwv\b/i.test(ua) && !window.AndroidBridge) {
+    return false;
+  }
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 
@@ -1882,10 +1893,38 @@ function watchSystemTheme() {
 // ========================
 //  FILE UPLOAD
 // ========================
+// Android WebView 兼容：fileInput.click() 对隐藏 input 在部分 WebView 中不触发，
+// 先尝试直接 click()，失败则用 mousedown/mouseup 事件模拟真实用户交互。
 uploadZone.addEventListener('click', function (e) {
   if (e.target.closest('.file-remove')) return;
-  fileInput.click();
+  triggerFileInput();
 });
+
+function triggerFileInput() {
+  // 方案 1：直接 click（标准浏览器 + 大部分 WebView）
+  fileInput.value = '';
+  try {
+    fileInput.click();
+  } catch (e1) {
+    // 方案 2：模拟鼠标事件（部分 WebView 需要 mousedown/mouseup 序列）
+    try {
+      var rect = fileInput.getBoundingClientRect();
+      var evt = new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: rect.left + 1, clientY: rect.top + 1 });
+      fileInput.dispatchEvent(evt);
+      evt = new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: rect.left + 1, clientY: rect.top + 1 });
+      fileInput.dispatchEvent(evt);
+    } catch (e2) {
+      // 方案 3：焦点 + 键盘 Enter（最终兜底）
+      fileInput.focus();
+      try {
+        var ke = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+        fileInput.dispatchEvent(ke);
+      } catch (e3) {
+        showToast('当前环境不支持文件上传，请使用浏览器直接打开此页面', 'error');
+      }
+    }
+  }
+}
 
 fileInput.addEventListener('change', function () {
   if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
@@ -2786,11 +2825,24 @@ function readFileTextSmart(file) {
 // ========================
 //  THEME
 // ========================
-themeToggle.addEventListener('click', function () {
+function cycleTheme() {
   var mode = document.documentElement.dataset.themeMode || 'auto';
   var next = mode === 'auto' ? 'light' : (mode === 'light' ? 'dark' : 'auto');
   applyTheme(next);
   saveSettings();
+}
+// Android WebView 中 click 事件有时不触发，用 touchend 作为备用入口
+var themeTouchUsed = false;
+themeToggle.addEventListener('touchend', function (e) {
+  // touchend 会触发 click，用标志位防止重复执行
+  themeTouchUsed = true;
+  e.preventDefault();
+  cycleTheme();
+  setTimeout(function () { themeTouchUsed = false; }, 500);
+});
+themeToggle.addEventListener('click', function () {
+  if (themeTouchUsed) return;
+  cycleTheme();
 });
 
 // ========================
