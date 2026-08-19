@@ -1748,7 +1748,16 @@ function normalizePunctuation(text) {
 
 // 繁体字统计：优先用 OpenCC 反向对比（精确），不可用时回退到内置繁体字符表
 var tradFallbackTable = null; /* 懒加载: dict/dict.js */
-var tradFallbackRe = new RegExp(tradFallbackTable, 'g');
+var tradFallbackRe = null;    /* 懒构建：词典未加载前不构造（否则 new RegExp(null) 会得到 /null/g） */
+
+// 懒构建繁体字表正则：确保词典加载完毕后再构造，避免在初始 null 上提前生成错误正则
+function getTradFallbackRe() {
+  if (!tradFallbackRe && tradFallbackTable) {
+    try { tradFallbackRe = new RegExp(tradFallbackTable, 'g'); }
+    catch (e) { tradFallbackRe = null; } /* 表非法时保留 null 跳过此回退 */
+  }
+  return tradFallbackRe;
+}
 
 function countTraditional(text) {
   if (typeof OpenCC !== 'undefined' && text.length < 2000000) {
@@ -1764,7 +1773,8 @@ function countTraditional(text) {
       }
     } catch (e) { /* fall through */ }
   }
-  return (text.match(tradFallbackRe) || []).length;
+  var re = getTradFallbackRe();
+  return re ? (text.match(re) || []).length : 0;
 }
 
 function countStats(text) {
@@ -2276,7 +2286,7 @@ async function processChunks(text, chunkFn, onProgress) {
   var out = [];
   for (var i = 0; i < total; i += chunkSize) {
     var chunk = lines.slice(i, i + chunkSize).join('\n');
-    out.push(chunkFn(chunk));
+    out.push(await chunkFn(chunk));
     if (onProgress) onProgress((i + chunkSize) / total);
     await new Promise(function (r) { setTimeout(r, 0); });
   }
@@ -2319,7 +2329,7 @@ async function processText() {
     var result = state.rawText;
 
     // 阶段 1+2+3：简繁转换（可开关）+ 行级净化 + 去除（分块执行，避免大文件卡死 UI）
-    result = await processChunks(result, function (chunk) {
+    result = await processChunks(result, async function (chunk) {
       var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
       t = cleanText(t, cleanVals);
       t = removeText(t, removeVals, customPatterns, useRegex);
@@ -2751,7 +2761,7 @@ btnBatchProcess.addEventListener('click', async function () {
     batchProgressText.textContent = '正在处理 (' + (i + 1) + '/' + total + ')：' + entry.file.name;
     try {
       var text = await readFileTextSmart(entry.file);
-      var processed = await processChunks(text, function (chunk) {
+      var processed = await processChunks(text, async function (chunk) {
         var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
         t = cleanText(t, cleanVals);
         t = removeText(t, removeVals, customPatterns, useRegex);
