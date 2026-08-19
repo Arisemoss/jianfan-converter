@@ -12,3 +12,4 @@ android/keystore/
 .idea/
 *.iml
 .DS_Store
+release.keystore
