@@ -60,12 +60,8 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
-        // 关闭 WebView 自动算法暗色（API 33+ 公开 API）：页面明暗由 data-theme 完全控制，
-        // 避免系统深色模式下页面被算法再变暗一次（双重变暗、颜色失真）。
-        // 注意：WebSettings.setForceDarkAllowed 是 @SystemApi 隐藏 API，应用层不能调用。
-        if (Build.VERSION.SDK_INT >= 33) {
-            s.setAlgorithmicDarkeningAllowed(false);
-        }
+        // WebView 暗色模式由 JS 端 data-theme 控制，不依赖系统算法变暗。
+        // 但保留系统 prefers-color-scheme 感知，让 JS 能读取真实系统主题。
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -87,9 +83,23 @@ public class MainActivity extends Activity {
                 }
                 filePathCallback = callback;
                 try {
-                    startActivityForResult(params.createIntent(), FILE_CHOOSER_REQUEST);
+                    Intent intent = params.createIntent();
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    // 显式设置 type 确保文件选择器能正确过滤
+                    if (params.getAcceptTypes() != null && params.getAcceptTypes().length > 0) {
+                        String type = params.getAcceptTypes()[0];
+                        if (type != null && !type.isEmpty() && !type.equals("*/*")) {
+                            intent.setType(type);
+                        }
+                    }
+                    startActivityForResult(Intent.createChooser(intent, "选择文件"), FILE_CHOOSER_REQUEST);
                 } catch (Exception e) {
-                    filePathCallback = null;
+                    e.printStackTrace();
+                    if (filePathCallback != null) {
+                        filePathCallback.onReceiveValue(null);
+                        filePathCallback = null;
+                    }
+                    toast("无法打开文件选择器");
                     return false;
                 }
                 return true;
@@ -98,7 +108,27 @@ public class MainActivity extends Activity {
 
         webView.addJavascriptInterface(new NativeBridge(), "AndroidBridge");
         setContentView(webView);
+
+        // 注入初始主题：在页面加载前设置 data-theme，避免闪白屏
+        String initTheme = isSystemDark() ? "dark" : "light";
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // 页面加载完成后同步导航栏
+                applyThemeBars(isSystemDark());
+            }
+        });
         webView.loadUrl("file:///android_asset/ebook-tool.html");
+        // 注入脚本在 DOM 就绪时立即设置主题（比 JS 执行更早）
+        webView.evaluateJavascript(
+            "(function(){ " +
+            "var d=document.documentElement;" +
+            "var dark=" + isSystemDark() + ";" +
+            "if(d.dataset.themeMode==='auto'||!d.dataset.themeMode){" +
+            "  d.dataset.theme=dark?'dark':'light';" +
+            "}" +
+            "})", null);
     }
 
     /** 标准布局：状态栏与 header 同色（深色+白图标），导航栏按当前主题着色 */
@@ -142,7 +172,12 @@ public class MainActivity extends Activity {
                     results = new Uri[]{ data.getData() };
                 }
             }
-            filePathCallback.onReceiveValue(results);
+            // 必须回调，否则 WebView 会卡死
+            try {
+                filePathCallback.onReceiveValue(results);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             filePathCallback = null;
             return;
         }
@@ -167,11 +202,19 @@ public class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        // 通知 JS：若当前处于「跟随系统」模式则重应用主题（并同步导航栏）；
-        // 手动模式不重应用，导航栏颜色由用户选择决定，不会被覆盖。
+        boolean dark = isSystemDark();
+        // 同步导航栏
+        applyThemeBars(dark);
+        // 通知 JS：若当前处于「跟随系统」模式则重应用主题
         if (webView != null) {
             webView.evaluateJavascript(
-                    "window.__systemThemeChanged && window.__systemThemeChanged();", null);
+                    "(function(){ " +
+                    "if(typeof window.__systemThemeChanged==='function') window.__systemThemeChanged();" +
+                    "var d=document.documentElement;" +
+                    "if(d.dataset.themeMode==='auto'){" +
+                    "  d.dataset.theme='" + (dark ? "dark" : "light") + "';" +
+                    "}" +
+                    "})()", null);
         }
     }
 
