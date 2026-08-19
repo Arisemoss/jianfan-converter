@@ -84,22 +84,15 @@ public class MainActivity extends Activity {
                 filePathCallback = callback;
                 try {
                     Intent intent = params.createIntent();
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    // 显式设置 type 确保文件选择器能正确过滤
-                    if (params.getAcceptTypes() != null && params.getAcceptTypes().length > 0) {
-                        String type = params.getAcceptTypes()[0];
-                        if (type != null && !type.isEmpty() && !type.equals("*/*")) {
-                            intent.setType(type);
-                        }
-                    }
-                    startActivityForResult(Intent.createChooser(intent, "选择文件"), FILE_CHOOSER_REQUEST);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NO_HISTORY);
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
                 } catch (Exception e) {
                     e.printStackTrace();
                     if (filePathCallback != null) {
                         filePathCallback.onReceiveValue(null);
                         filePathCallback = null;
                     }
-                    toast("无法打开文件选择器");
+                    toast("无法打开文件选择器，请检查文件管理器权限");
                     return false;
                 }
                 return true;
@@ -109,26 +102,24 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new NativeBridge(), "AndroidBridge");
         setContentView(webView);
 
-        // 注入初始主题：在页面加载前设置 data-theme，避免闪白屏
-        String initTheme = isSystemDark() ? "dark" : "light";
+        // 页面加载完成后：1) 注入初始主题 2) 同步导航栏
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // 页面加载完成后同步导航栏
-                applyThemeBars(isSystemDark());
+                boolean dark = isSystemDark();
+                applyThemeBars(dark);
+                // 注入初始主题到 DOM（此时页面已加载，JS 上下文可用）
+                view.evaluateJavascript(
+                    "(function(){ " +
+                    "var d=document.documentElement;" +
+                    "if(!d.dataset.themeMode||d.dataset.themeMode==='auto'){" +
+                    "  d.dataset.theme='" + (dark ? "dark" : "light") + "';" +
+                    "}" +
+                    "})", null);
             }
         });
         webView.loadUrl("file:///android_asset/ebook-tool.html");
-        // 注入脚本在 DOM 就绪时立即设置主题（比 JS 执行更早）
-        webView.evaluateJavascript(
-            "(function(){ " +
-            "var d=document.documentElement;" +
-            "var dark=" + isSystemDark() + ";" +
-            "if(d.dataset.themeMode==='auto'||!d.dataset.themeMode){" +
-            "  d.dataset.theme=dark?'dark':'light';" +
-            "}" +
-            "})", null);
     }
 
     /** 标准布局：状态栏与 header 同色（深色+白图标），导航栏按当前主题着色 */
