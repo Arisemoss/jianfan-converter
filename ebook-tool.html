@@ -70,7 +70,7 @@ body {
   background-image: var(--bg-tex);
   color: var(--ink);
   min-height: 100vh;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   line-height: 1.6;
   transition: background-color 0.4s ease, color 0.4s ease;
 }
@@ -848,9 +848,17 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 }
 
 /* --- 9. CHECKBOX CHIP --- */
-.checkbox-item { transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.checkbox-item {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 0.25s ease, border-color 0.25s ease,
+              box-shadow 0.25s ease, color 0.25s ease;
+}
 .checkbox-item:active { transform: scale(0.95); }
-.checkbox-item.active { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.checkbox-item.active {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 0.3s ease, border-color 0.3s ease,
+              box-shadow 0.3s ease, color 0.3s ease;
+}
 
 /* --- 10. FOCUS GLOW --- */
 .styled-select:focus { box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.2), 0 2px 8px rgba(201, 169, 110, 0.1); }
@@ -864,7 +872,10 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 .header-icon:hover { transform: scale(1.08) rotate(-3deg); box-shadow: 0 4px 16px rgba(201,169,110,0.4); }
 
 /* --- 13. FILE REMOVE --- */
-.file-remove { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.file-remove {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
 .file-remove:hover { transform: rotate(90deg) scale(1.1); }
 
 /* --- 14. BATCH ITEM --- */
@@ -892,6 +903,38 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   .toast.removing { animation: none; opacity: 0; transition: opacity 0.2s; }
   .preview-pane { scroll-behavior: auto; }
 }
+
+
+/* ============================================================
+   18. COMPATIBILITY & PERFORMANCE (safe defaults)
+   原则：动画只作用于 transform / opacity（走 GPU 合成，避免重排）；
+   hover 位移仅在精确指针上启用，触屏/低性能设备自动降级为无位移。
+   ============================================================ */
+
+/* 触屏（pointer:coarse / hover:none）：关闭“粘滞 hover”的位移/旋转，
+   避免点击后元素停留在被抬起/旋转的状态；颜色与盒阴影保留无碍 */
+@media (hover: none), (pointer: coarse) {
+  .theme-toggle:hover { transform: none; }
+  .upload-zone:hover { transform: none; }
+  .file-remove:hover { transform: none; }
+  .stat-card:hover { transform: none; }
+  .tool-card:hover { transform: none; }
+  .checkbox-item:hover { transform: none; }
+  .header-icon:hover { transform: none; }
+  .btn-primary:hover:not(:disabled), .btn-gold:hover:not(:disabled) { transform: none; }
+}
+
+/* 只对鼠标等精确指针启用悬浮上浮（配合上面的触屏降级） */
+@media (hover: hover) and (pointer: fine) {
+  .upload-zone:hover { transform: translateY(-2px); }
+  .stat-card:hover { transform: translateY(-2px); }
+  .tool-card:hover { transform: translateY(-2px); }
+}
+
+/* 按压反馈：所有指针类型通用，轻微缩放提升触感（兼容主流浏览器与 WebView） */
+.theme-toggle:active { transform: scale(0.92) rotate(10deg); }
+.upload-zone:active:not(.dragover):not(.has-file) { transform: scale(0.99); }
+.batch-item .b-remove:active { transform: scale(0.9); }
 
 
 /* --- DIFF VIEW --- */
