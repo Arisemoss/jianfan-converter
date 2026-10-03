@@ -464,6 +464,11 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
 .preview-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 .preview-pane::-webkit-scrollbar-thumb:hover { background: var(--warm-gray); }
 .preview-pane.hidden { display: none; }
+/* 分屏对比视图：两个 pane 并排 */
+#previewSection.split { display: flex; flex-wrap: wrap; }
+#previewSection.split .preview-tabs { width: 100%; }
+#previewSection.split .preview-pane { flex: 1 1 0; min-width: 0; border-radius: 0 0 var(--radius) var(--radius); }
+#previewSection.split .preview-pane + .preview-pane { border-left: none; }
 .preview-pane .placeholder { color: var(--warm-gray-light); text-align: center; padding: 60px 20px; font-family: 'Noto Sans SC', sans-serif; }
 .preview-pane .placeholder .big-icon { font-size: 40px; display: block; margin-bottom: 12px; }
 
@@ -1214,7 +1219,7 @@ textarea.custom-input { resize: vertical; min-height: 60px; }
   </div>
 
   <!-- Preview -->
-  <div class="preview-section" style="margin-top:16px;">
+  <div class="preview-section" id="previewSection" style="margin-top:16px;">
     <div class="preview-tabs">
       <button class="preview-tab active" data-pane="originalPane">原始文本 <span class="count" id="origCount">0 字</span></button>
       <button class="preview-tab" data-pane="resultPane">处理后文本 <span class="count" id="resultCount">0 字</span></button>
@@ -1335,7 +1340,11 @@ function ensureOpenCC() {
 function ensureJSZip() {
   if (typeof JSZip !== 'undefined') return Promise.resolve(true);
   if (jszipPromise) return jszipPromise;
-  jszipPromise = loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 8000);
+  jszipPromise = loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 8000).then(function (ok) {
+    // 失败不缓存：清空后下次调用可重试（离线加载过一次的场景）
+    if (!ok) jszipPromise = null;
+    return ok;
+  });
   return jszipPromise;
 }
 
@@ -1477,12 +1486,24 @@ function extractEpubText(uint8) {
         var match = xml.match(/full-path="([^"]+)"/);
         if (match) opfPath = match[1];
         if (!opfPath) return null;
+        // full-path 可能带 URL 编码（如 %20），zip 内路径通常为解码后字面量
+        try { if (zip.file(opfPath) === null) opfPath = decodeURIComponent(opfPath); } catch (e) { /* 保持原样 */ }
+        if (zip.file(opfPath) === null) return null;
         // 读取 OPF 找到 spine 顺序
         return zip.file(opfPath).async('text').then(function (opf) {
           var items = [];
-          var itemRe = /<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"/g;
+          // 属性顺序不保证：分别提取每个 <item> 标签的 id/href，而不是依赖先后顺序
+          var itemRe = /<item\s[^>]*>/g;
           var m;
-          while ((m = itemRe.exec(opf)) !== null) items.push({ id: m[1], href: m[2] });
+          while ((m = itemRe.exec(opf)) !== null) {
+            var idM = m[0].match(/\bid="([^"]+)"/);
+            var hrefM = m[0].match(/\bhref="([^"]+)"/);
+            if (idM && hrefM) {
+              var href = hrefM[1];
+              try { href = decodeURIComponent(href); } catch (e) { /* 保持原样 */ }
+              items.push({ id: idM[1], href: href });
+            }
+          }
           var spineRe = /<itemref[^>]+idref="([^"]+)"/g;
           var spine = [];
           while ((m = spineRe.exec(opf)) !== null) spine.push(m[1]);
@@ -1493,6 +1514,7 @@ function extractEpubText(uint8) {
             if (!item) return Promise.resolve('');
             var fullPath = opfDir + item.href;
             var f = zip.file(fullPath);
+            if (!f) f = zip.file(item.href);
             if (!f) return Promise.resolve('');
             return f.async('text').then(function (html) {
               // 简单去 HTML 标签
@@ -2170,6 +2192,9 @@ function animateStatNumber(el, target, duration) {
 // ========================
 document.querySelectorAll('.preview-tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
+    // 点击页签即退出分屏模式，回到单栏
+    var sec = $('previewSection');
+    if (sec) sec.classList.remove('split');
     document.querySelectorAll('.preview-tab').forEach(function (t) { t.classList.remove('active'); });
     tab.classList.add('active');
     var currentPane = null;
@@ -2261,6 +2286,7 @@ function undo() {
     showPreview('result', state.processedText);
     btnDownload.disabled = false;
     btnCopyResult.disabled = false;
+    $('btnShowDiff').disabled = false;
   } else {
     clearResult();
   }
@@ -2279,6 +2305,7 @@ function redo() {
     showPreview('result', state.processedText);
     btnDownload.disabled = false;
     btnCopyResult.disabled = false;
+    $('btnShowDiff').disabled = false;
   } else {
     clearResult();
   }
@@ -2453,6 +2480,7 @@ btnProcessAll.addEventListener('click', async function () {
     showPreview('result', result);
     btnDownload.disabled = false;
     btnCopyResult.disabled = false;
+    $('btnShowDiff').disabled = false;
     document.querySelectorAll('.preview-tab')[1].click();
     updateUndoRedo();
     showToast('处理完成！', 'success');
@@ -2702,18 +2730,21 @@ btnCopyResult.addEventListener('click', async function () {
 });
 
 btnTogglePreviewMode.addEventListener('click', function () {
-  var panes = document.querySelectorAll('.preview-pane');
-  var tabs = document.querySelectorAll('.preview-tab');
-  var isSplit = !panes[0].classList.contains('hidden') && !panes[1].classList.contains('hidden');
+  var section = $('previewSection');
+  var panes = document.querySelectorAll('#previewSection .preview-pane');
+  var tabs = document.querySelectorAll('#previewSection .preview-tab');
+  var isSplit = section.classList.contains('split');
   if (isSplit) {
-    tabs.forEach(function (t, i) {
-      t.style.display = '';
-      panes[i].classList.remove('hidden');
-    });
-    document.querySelectorAll('.preview-tab').forEach(function (t) { t.classList.remove('active'); });
-    document.querySelectorAll('.preview-pane').forEach(function (p) { p.classList.add('hidden'); });
-    document.querySelector('.preview-tab').classList.add('active');
-    $('originalPane').classList.remove('hidden');
+    // 分屏 → 页签：回到原始文本
+    section.classList.remove('split');
+    panes.forEach(function (p) { p.classList.add('hidden'); });
+    tabs.forEach(function (t) { t.classList.remove('active'); });
+    if (tabs[0]) tabs[0].classList.add('active');
+    if (panes[0]) panes[0].classList.remove('hidden');
+  } else {
+    // 页签 → 分屏：两栏并排对比
+    section.classList.add('split');
+    panes.forEach(function (p) { p.classList.remove('hidden'); });
   }
 });
 
@@ -2803,7 +2834,15 @@ btnBatchProcess.addEventListener('click', async function () {
     renderBatchList();
     batchProgressText.textContent = '正在处理 (' + (i + 1) + '/' + total + ')：' + entry.file.name;
     try {
-      var text = await readFileTextSmart(entry.file);
+      var text;
+      if (/\.epub$/i.test(entry.file.name)) {
+        // EPUB 是二进制 zip，必须走解包提取（与单文件路径一致），不能按纯文本解码
+        var epubBuf = new Uint8Array(await entry.file.arrayBuffer());
+        text = await extractEpubText(epubBuf);
+        if (!text) throw new Error('EPUB 解析失败');
+      } else {
+        text = await readFileTextSmart(entry.file);
+      }
       var processed = await processChunks(text, async function (chunk) {
         var t = convEnabled ? await convertText(chunk, convDirection) : chunk;
         t = cleanText(t, cleanVals);
@@ -2927,7 +2966,7 @@ document.addEventListener('keydown', function (e) {
     e.preventDefault();
     undo();
   }
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z') && !isInput) {
     e.preventDefault();
     redo();
   }
@@ -3044,6 +3083,11 @@ $('encodingSelect').addEventListener('change', function () {
   $('encodingStatus').textContent = '正在重新解码...';
   if (enc === 'auto') {
     readFileWithEncoding(_currentRawFile).then(function (r) {
+      if (!r.text && _currentRawFile.size > 0) {
+        $('encodingStatus').textContent = '自动解码失败，已保留当前文本';
+        showToast('该文件无法按自动检测解码，已保留当前文本', 'error');
+        return;
+      }
       state.rawText = r.text;
       $('encodingStatus').textContent = '自动: ' + r.encoding;
       refreshPreview();
@@ -3051,6 +3095,12 @@ $('encodingSelect').addEventListener('change', function () {
   } else {
     _currentRawFile.arrayBuffer().then(function (buf) {
       var r = tryDecode(new Uint8Array(buf), enc);
+      if (!r.text && _currentRawFile.size > 0) {
+        // 解码失败时 tryDecode 返回空串：保留现有文本，避免内容被清空
+        $('encodingStatus').textContent = enc + ' 解码失败，已保留当前文本';
+        showToast('无法用 ' + enc + ' 解码此文件，已保留当前文本', 'error');
+        return;
+      }
       state.rawText = r.text;
       $('encodingStatus').textContent = enc + (r.confidence < 0.9 ? ' (置信度偏低)' : '');
       refreshPreview();
