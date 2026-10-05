@@ -1,6 +1,6 @@
 // 文简书斋 Service Worker
 // 提供离线缓存 + 静态资源加速
-var CACHE_NAME = 'wenjian-v2';
+var CACHE_NAME = 'wenjian-v3';
 var PRECACHE = [
   './',
   './ebook-tool.html',

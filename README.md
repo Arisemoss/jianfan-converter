@@ -44,7 +44,7 @@ android/ 目录是一个零第三方依赖的手写 WebView 壳：
 
 ## 支持的文件格式
 
-`TXT` `HTML` `HTM` `MD` `CSV` `JSON` `XML`
+`TXT` `MD` `HTML/HTM` `CSV` `JSON` `XML` `LOG` `YAML/TOML/INI/CONF/CFG` `SRT/VTT` `EPUB`（提取正文） `RTF`（按纯文本读取）
 
 ## 技术栈
 

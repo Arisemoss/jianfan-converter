@@ -161,7 +161,7 @@
 - `$(id)`：`document.getElementById` 简写。
 - `var xxx = $('yyy')` 批量 DOM 引用。
 - `lastSavedUri` / `lastSavedMime`：Android 原生保存后的 URI，供「分享/打开」复用。
-- 主题图标常量 `ICON_AUTO/LIGHT/DARK`（代理对写法避免 emoji 乱码）。
+- 主题图标常量 `ICON_AUTO/LIGHT/DARK`（内联 SVG，描边继承 currentColor 自动适配主题）。
 
 ### 4.5 处理管线（PROCESSING PIPELINE）
 
@@ -193,12 +193,12 @@
 - `state.batchFiles`：批量文件列表（文件 + 状态 pending/run/ok/err）。
 - `renderBatchList()`：渲染列表，动态按钮绑定。
 - `btnBatchProcess` 点击处理：逐文件读取（`readFileTextSmart` 带编码检测）→ 分块执行管道 → 汇总。JSZip 可用则打包 `batch_processed_时间戳.zip` 一个文件下载，否则逐个下载。
-- `readFileText(file)` / `readFileTextSmart(file)`：批量读取辅助。
+- `readFileTextSmart(file)`：批量读取辅助（带编码检测）。
 
 ### 4.9 主题系统与设置持久化
 
 - `SETTINGS_KEY`：`wjshuzhai.settings.v1`（localStorage）。
-- `loadSettings()` / `saveSettings()`：读写转换方向、勾选项、正则开关、自定义模式、主题。
+- `loadSettings()` / `saveSettings()`：读写转换方向、勾选项、正则开关、自定义模式、查找选项、主题。
 - `systemPrefersDark()`：读取系统深色；Android App 优先用 `AndroidBridge.isSystemDark()`，WebView 环境下修正 matchMedia 不可靠问题。
 - `applyTheme(mode)`：三态主题 auto/light/dark，更新 `data-theme`/`data-theme-mode`、meta 主题色、按钮图标，并通知原生导航栏（`AndroidBridge.setTheme`）。
 - `watchSystemTheme()`：监听系统主题变化（原生 `__systemThemeChanged` 与 `matchMedia`）。
